@@ -15,6 +15,11 @@ to that prompt-lookup fork, including sampled turns. Parallel preparation of
 large snapshot buffers cuts checkpoint capture about **43–44%**; 32K controls
 are stable. [Long-turn results](BENCHMARKS.md#framework-fork-long-turn-checkpoints).
 
+Native-lane vector reductions add a modest **0.6–1.0%** greedy copy/edit decode
+gain over the snapshot fork. Sampled gains are smaller; the 133K sampled turn
+is effectively stable. All compared outputs remain exact.
+[Reduction measurements](BENCHMARKS.md#framework-fork-exact-vector-reductions).
+
 ## Build on this machine
 
 ```sh
@@ -150,16 +155,17 @@ It does not establish equivalence to the unquantized original model; upstream's
 
 ## Optimization roadmap
 
-1. **Long-turn checkpoint latency.** Measure the complete request, including
-   fresh snapshots, at 32K and 133K+ depth. Separate first-touch/page-compaction
-   stalls from transfer time; compare snapshot bytes and restored sampled state.
-2. **Sampled decoding.** The sampled/thinking code-edit trace puts 47.2% of
-   decode-tail kernel time in dense quantized-vector projections, with 87.8%
-   GPU-busy time. Target exact projection reuse/GEMV improvements, and profile
-   CPU filtering before changing it. Retain FP64 probabilities and seeded replay.
-3. **Deep prefill.** Use pp2048/tg128 controls at 32K, expanding to 128K after a
-   win. Existing profiles put dense projections and routed experts ahead of
-   attention/indexing; benchmark complete turns after operator qualification.
+1. **Checkpoint latency: completed.** Parallel huge-page population improves
+   133K whole turns 3.5–3.6%, with exact snapshot/state checks and busy-desktop
+   controls. Continue including allocation/capture/release in turn measurements.
+2. **Vector reductions: qualified.** Native-lane exchange preserves the original
+   addition tree and lowers decode cost modestly. The largest Q8 head remains
+   bandwidth-bound; further gains require better projection reuse. Preserve
+   FP64 probabilities and seeded replay when investigating sampled execution.
+3. **Deep prefill: next.** Refresh the dense/routed projection profile on this
+   toolchain at 32K. Prioritize measured weight/activation reuse and tile costs,
+   then expand a winning pp2048/tg128 comparison to 133K+. The existing chunk
+   sweep favored 2048; wider chunks need fresh evidence and memory measurements.
 4. **Coding-task evidence.** Add bounded, executable repository-edit tasks with
    test-based success criteria, tool-call counts and total completion time.
    Keep synthetic replay fixtures for precise regression diagnosis.
@@ -206,3 +212,50 @@ the model/MTP arguments and prints a hash of the complete serialized snapshot.
 It checks full-logit restoration, persistent bytes, sampled continuation,
 deferred residual/RNG replay and rejection of malformed snapshots. The session
 test also captures a large frozen peer during decode graph capture.
+
+### Vector-reduction measurements
+
+The reduction comparison uses saved production `61a617b` and candidate
+binaries with the same toolchain. Short fixtures use the existing
+`framework-bench.py` driver in both measurement orders. Thinking-enabled
+long turns preserve the full assistant message, including reasoning, in their
+replay hashes:
+
+```sh
+python3 tools/qwen-flash/framework-turn-bench.py --depth 32768 --think on \
+  --output artifacts/framework/thinking-baseline-32k.json
+python3 tools/qwen-flash/framework-turn-bench.py --depth 32768 --think on \
+  --compare artifacts/framework/thinking-baseline-32k.json \
+  --output artifacts/framework/thinking-candidate-32k.json
+# Repeat both arms with --depth 133120 and distinct output paths.
+```
+
+These C1 runs retain 196,608-token capacity. For a separate batched regression,
+start each binary with `--sessions 8 --context 4096 --think off` and
+`--max-pending-per-client 8`, retaining the same model/MTP and seven-draft cap:
+
+```sh
+python3 tools/qwen-flash/framework-batch-bench.py --source-revision 61a617b \
+  --fingerprint artifacts/framework/fingerprint.json \
+  --output artifacts/framework/batch-baseline.json
+python3 tools/qwen-flash/framework-batch-bench.py --source-revision "$(git rev-parse HEAD)" \
+  --fingerprint artifacts/framework/fingerprint.json \
+  --source-dirty --compare artifacts/framework/batch-baseline.json \
+  --output artifacts/framework/batch-candidate.json
+```
+
+Supply the same machine fingerprint on both arms, with compiler/runtime
+versions verified against the installed toolchain as described in the research
+notes. The batch driver warms complete tg128 cohorts at every width, then
+prepares every session before each of three measured decode cohorts. It mixes
+prose and code-edit fixtures and checks C1/2/4/6/8 completion/cache counts.
+Restore the normal C1/196,608 deployment after this short-context control.
+The focused operator binaries accept `--decode-only`:
+`qwen38_flash_next_projection_ops_test` and
+`qwen38_flash_next_routed_wmma_ops_test`. The standalone reduction diagnostic
+checks original-versus-candidate bytes while rotating weights beyond MALL:
+
+```sh
+tools/bench/build.sh tools/qwen-flash/q8_reduce_bench.hip
+/tmp/q8_reduce_bench
+```

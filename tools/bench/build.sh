@@ -59,6 +59,10 @@ for t in "${targets[@]}"; do
     # Exact projection comparisons use the production compiler optimization level.
     compile[1]=-O2
   fi
+  if [[ "$src" -ef tools/qwen-flash/q8_reduce_bench.hip ]]; then
+    # Match the production MMVQ contraction/reassociation options.
+    compile+=(-ffast-math -fno-finite-math-only)
+  fi
   native_sources=()
   if [[ "$src" -ef tools/qwen27b/dflash_gemm_bench.hip ||
         "$src" -ef tools/qwen27b/prefill_gemm_bench.hip ]]; then

@@ -99,7 +99,7 @@ __launch_bounds__(64) static __global__ void mul_mat_vec_moe_batch(
         continue;
 #pragma unroll
       for (int r = 0; r < 2; ++r)
-        sum[t][r] = warp_reduce_sum<32>(sum[t][r]);
+        sum[t][r] = mmvq_reduce_sum(sum[t][r]);
       if (lane < 2)
         values[t][is_up][lane] = isfinite(sum[t][lane]) ? sum[t][lane] : 0.0f;
     }

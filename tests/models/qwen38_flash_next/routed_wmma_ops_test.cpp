@@ -707,10 +707,20 @@ void CheckPairedMmq() {
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  const bool decode_only = argc == 2 && std::string(argv[1]) == "--decode-only";
+  if (argc != 1 && !decode_only) {
+    std::cerr << "Usage: routed_wmma_ops_test [--decode-only]\n";
+    return 2;
+  }
   try {
     CheckVectorGrouping();
     CheckVectorGrouping(true);
+    if (decode_only) {
+      std::cout << "Routed decode grouping, SwiGLU, ragged rows, guards and "
+                   "nonfinite checks pass\n";
+      return 0;
+    }
     CheckPairedMmq();
     bool ok = true;
     // Gate/up view: 64 experts, top-10, 640 x 2560 Q4_K.

@@ -4,6 +4,26 @@
 constexpr int MMVQ_MAX_BATCH_SIZE = 8;
 constexpr int MMVQ_MAX_ROUTED_BATCH = 64;
 
+template<int mask>
+static __device__ __forceinline__ float mmvq_xor_add_dpp(float x) {
+  const int y = __builtin_amdgcn_update_dpp(
+      0, __builtin_bit_cast(int, x), 0x160 | mask, 0xF, 0xF, false);
+  return x + __builtin_bit_cast(float, y);
+}
+
+// Keep the original descending 32-lane XOR tree, including separate halves
+// of wave64. The row exchange and four DPP adds avoid LDS permutes on gfx1151.
+static __device__ __forceinline__ float mmvq_reduce_sum(float x) {
+  const unsigned bits = __builtin_bit_cast(unsigned, x);
+  x += __builtin_bit_cast(float, __builtin_amdgcn_permlanex16(
+                                    bits, bits, 0x76543210U, 0xfedcba98U,
+                                    false, false));
+  x = mmvq_xor_add_dpp<8>(x);
+  x = mmvq_xor_add_dpp<4>(x);
+  x = mmvq_xor_add_dpp<2>(x);
+  return mmvq_xor_add_dpp<1>(x);
+}
+
 // One expert's independent inputs, in groups of eight. The anchor also
 // identifies an inactive slot that must be zeroed.
 struct MoeBatchGroup {

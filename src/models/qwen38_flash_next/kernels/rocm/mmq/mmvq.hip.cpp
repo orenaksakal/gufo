@@ -43,9 +43,9 @@ __launch_bounds__(32 * token_waves, 1) static __global__
   }
 #pragma unroll
   for (int j = 0; j < ncols_dst; ++j) {
-    sum[j] = warp_reduce_sum<32>(sum[j]);
+    sum[j] = mmvq_reduce_sum(sum[j]);
     if constexpr (has_gate)
-      gate_sum[j] = warp_reduce_sum<32>(gate_sum[j]);
+      gate_sum[j] = mmvq_reduce_sum(gate_sum[j]);
     if (lane == 0 && (token_waves == 1 || first_token + j < valid_tokens)) {
       float value = sum[j];
       if constexpr (has_gate)
@@ -230,7 +230,7 @@ __launch_bounds__(mmvq_moe_max_batch(type) * (gated ? 64 : 32),
     // Warp-level reduction only - no shared memory needed
 #pragma unroll
     for (int i = 0; i < c_rows_per_block; ++i) {
-        tmp[i] = warp_reduce_sum<warp_size>(tmp[i]);
+        tmp[i] = mmvq_reduce_sum(tmp[i]);
     }
 
     if constexpr (gated) {
@@ -379,7 +379,7 @@ __launch_bounds__(64) static __global__
       continue;
 #pragma unroll
     for (int r = 0; r < 2; ++r)
-      sum[t][r] = warp_reduce_sum<32>(sum[t][r]);
+      sum[t][r] = mmvq_reduce_sum(sum[t][r]);
     if (lane < 2)
       values[t][is_up][lane] = isfinite(sum[t][lane]) ? sum[t][lane] : 0.0f;
   }

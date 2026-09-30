@@ -108,6 +108,30 @@ can reach EOS before the 128-token budget. The existing vision qualification
 limits above apply. [Bounded evidence](artifacts/framework-snapshot-review.json)
 and [reproduction](FRAMEWORK.md#long-turn-checkpoint-measurements).
 
+## Framework native-lane reductions
+
+The gfx1151 vector kernels retain their descending 32-lane addition tree,
+including independent halves of the wave64 expert kernel. Qualification uses
+the same local toolchain and quantized weights as the snapshot iteration.
+
+| Check | Result |
+| --- | --- |
+| Standalone Q8 projections | All 32 shape/token cases match the original shuffle reduction byte-for-byte; every cold-weight ring slot checked |
+| Dense operators | Scalar/batched/gated/ragged outputs and guards exact; graph replay and independent FP64 head dots pass, including small activations |
+| Routed operators | Q4_K/Q5_K/Q5_1/Q8_0 grouping, separate/fused SwiGLU, duplicated/inactive experts, ragged rows, nonfinite scales and guards pass |
+| Model state | C2/C4/C6/C8 full logits, tokens and RNG match isolated execution; cancellation, rollback, independent state, sampled residuals and peer snapshots during graph capture pass |
+| 32K replay | Lookup versus AR full logits/tokens/RNG, restored state and sampled replay exact at 224/32,768 tokens |
+| Sampling | All 23 configurations pass AR/MTP, C2 and budget replay |
+| Sampled/thinking profile | Identical 128-token ID hash and 78,005 inference kernel launches |
+| Short HTTP | 30/30 tg128 completion hashes and token counts match across both measurement orders |
+| Long HTTP | 18/18 completion hashes and token/cache counts match; thinking-on reaches 133,295 cached tokens at 196,608 capacity |
+| Prepared batch HTTP | 66/66 tg128 completion hashes and token/cache counts match at C1/2/4/6/8 after full decode warmup; physical widths verified |
+| OpenCode HTTP contract | All eight cases match the snapshot fork, including streamed reasoning/tools, tool-result continuation, strict JSON and exact reuse of 134,063 prompt tokens |
+
+The local vision-sidecar limitation above still applies.
+[Bounded evidence](artifacts/framework-dpp-review.json) ·
+[Reproduction](FRAMEWORK.md#vector-reduction-measurements).
+
 ## Benchmark method
 
 Gufo single-user TG refreshed September 27, 2026 (`f797b5b`); PP and other

@@ -70,6 +70,73 @@ normal demand paging on page-population failure.
 [Reproduction](FRAMEWORK.md#long-turn-checkpoint-measurements) ·
 [Timings, hashes and qualification](artifacts/framework-snapshot-review.json).
 
+## Framework fork: exact vector reductions
+
+September 30, 2026 UTC; snapshot fork `61a617b` versus gfx1151 native-lane
+reductions in dense and routed vector projections. Same production toolchain,
+weights, C1, **196,608-token capacity**, seven-draft cap and seed 73. One warmup
+and three cache-bypassed tg128 samples per fixture. This table shows the
+candidate-first/baseline-second confirmation; the opposite order also passed.
+
+| Fixture | Decode tok/s, before → after | Decode gain | HTTP wall ms, before → after |
+| --- | ---: | ---: | ---: |
+| Prose | 37.38 → 37.50 | +0.32% | 4,738.3 → 4,733.1 |
+| Copy code | 83.64 → 84.12 | +0.57% | 2,453.1 → 2,437.5 |
+| Edit code | 85.03 → 85.84 | +0.95% | 2,441.0 → 2,422.9 |
+| Repetition | 105.64 → 106.56 | +0.88% | 2,499.4 → 2,485.2 |
+| Sampled code | 67.68 → 67.77 | +0.14% | 2,826.6 → 2,821.2 |
+
+All **30/30** measured completion hashes and counts match across the two
+orders. Thinking is off; sampled code uses temperature 1/top-p .95/top-k 20.
+The sampled gain is small: +0.70% in the first order and +0.14% in the reverse
+order. The optimization preserves the original addition tree and adds no
+allocation or weight copy.
+
+Thinking-enabled turns append **2,059 tokens** to the cached coding/tool
+history at the same 196,608 capacity. One warmup and three distinct branches per
+mode; medians include checkpoint capture and the complete HTTP request:
+
+| Cached tokens | Mode | HTTP wall ms, before → after | Wall reduction |
+| ---: | --- | ---: | ---: |
+| 32,920 | Greedy | 3,688.4 → 3,662.3 | +0.71% |
+| 32,920 | Sampled | 4,614.2 → 4,593.1 | +0.46% |
+| 133,295 | Greedy | 3,744.0 → 3,714.8 | +0.78% |
+| 133,295 | Sampled | 4,141.9 → 4,159.6 | −0.43% |
+
+All **12/12** messages and token/cache counts match. Outputs fill tg128 except
+one deep sampled branch ending at 67 tokens. The deep sampled median pair
+spends 20.1 ms more in checkpoint capture and 1.0 ms less in decoding; it does
+not demonstrate a long sampled-turn speedup. Thinking-off 32K controls are
+effectively stable: **+0.37% / −0.11%** greedy/sampled whole-request reductions,
+with all six bounded-EOS responses exact.
+
+Prepared mixed prose/code-edit concurrency controls use a separate eight-session
+server at capacity 4,096. Complete tg128 warmup cohorts visit every width before
+three measured cohorts; every session is prefilled before decoding. Rates are
+the median sum of individual request decode rates, rather than total tokens
+divided by cohort wall time:
+
+| Clients | Decode tok/s, before → after | Gain |
+| ---: | ---: | ---: |
+| 1 | 58.18 → 58.40 | +0.38% |
+| 2 | 85.88 → 86.76 | +1.03% |
+| 4 | 137.86 → 140.15 | +1.66% |
+| 6 | 161.07 → 162.44 | +0.85% |
+| 8 | 173.82 → 178.30 | +2.58% |
+
+All **66/66** completion hashes and token/cache counts match, with the requested
+physical batch widths observed. C1 summarizes both fixture types and is not
+directly comparable to either individual fixture above. These remain synthetic
+regression workloads; executable coding-task scores are a separate roadmap item.
+
+The separate sampled/thinking CLI profile retains the same 128-token hash and
+78,005 inference launches. Decode-tail kernel time falls **2,477.5 → 2,465.0
+ms**, and its wall span **2,821.5 → 2,811.3 ms**. Instrumented timings explain
+the mechanism; the table above uses unprofiled HTTP requests.
+
+[Reproduction](FRAMEWORK.md#vector-reduction-measurements) ·
+[Bounded measurements and qualification](artifacts/framework-dpp-review.json).
+
 ## Single user, autoregressive
 
 Approximately pp2048 / tg128; depth is the cached prefix in tokens.

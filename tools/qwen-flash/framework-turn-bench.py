@@ -33,6 +33,7 @@ def main():
     parser.add_argument("--model", default="Qwen3.8-Flash-Next-UD-Q4_K_XL")
     parser.add_argument("--depth", type=int, default=32768)
     parser.add_argument("--repetitions", type=int, default=3)
+    parser.add_argument("--think", choices=("off", "on"), default="off")
     parser.add_argument("--resident-mib", type=int, default=0,
                         help="retain this much ordinary host RAM during turns (local server only)")
     parser.add_argument("--output", type=Path, required=True)
@@ -41,10 +42,12 @@ def main():
     if args.depth < 4096 or args.repetitions < 1 or args.resident_mib < 0:
         parser.error("depth must be at least 4096, repetitions positive and resident MiB nonnegative")
     baseline = json.loads(args.compare.read_text()) if args.compare else None
-    settings = {"depth": args.depth, "repetitions": args.repetitions, "output_budget": 128}
+    settings = {"depth": args.depth, "repetitions": args.repetitions, "output_budget": 128,
+                "thinking": args.think == "on"}
     if args.resident_mib:
         settings["resident_mib"] = args.resident_mib
-    if baseline and (not baseline.get("passed") or baseline["settings"] != settings):
+    if baseline and (not baseline.get("passed") or
+                     {"thinking": False, **baseline["settings"]} != settings):
         parser.error("baseline must pass and use identical measurement settings")
     with urllib.request.urlopen(args.url.rstrip("/") + "/v1/models", timeout=10) as response:
         card = next(m for m in json.load(response)["data"] if m["id"] == args.model)
@@ -55,7 +58,7 @@ def main():
         parser.error("baseline and candidate context capacities differ")
     common = {"model": args.model, "max_tokens": 128, "temperature": 0, "seed": 73,
               "top_k": 0, "top_p": 1, "tools": helpers["TOOLS"], "tool_choice": "none",
-              "chat_template_kwargs": {"enable_thinking": False, "preserve_thinking": True}}
+              "chat_template_kwargs": {"enable_thinking": settings["thinking"], "preserve_thinking": True}}
     # Keep calibration traffic/cache history identical in both arms.
     empty, _ = call(args.url, {**common, "messages": history(0), "max_tokens": 1, "cache_prompt": False})
     probe, _ = call(args.url, {**common, "messages": history(64), "max_tokens": 1, "cache_prompt": False})

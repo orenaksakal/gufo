@@ -24,7 +24,7 @@ or source fragments were incorporated. Existing Gufo third-party notices apply.
 
 ## Retained numerical contract
 
-The target GGUF shards, Q8 MTP head, target kernels, attention selection, KV
+The target GGUF shards, Q8 MTP head, target arithmetic, attention selection, KV
 precision, recurrent state and sampler mathematics are preserved. The new CPU
 index recognizes a four-token suffix including the target anchor and first MTP
 proposal. It appends up to six committed-history tokens to the verification
@@ -38,6 +38,14 @@ contexts retain the existing path. Copy acceptance trains neither the deeper
 MTP acceptance estimates nor its runtime batch-cost table. The index can be
 reconstructed from the snapshot's committed tokens, so it adds no persistent
 snapshot payload or mutable cross-request cache.
+
+The vector-reduction iteration substitutes gfx1151 lane-exchange instructions
+for the existing 32-lane XOR shuffles. It keeps the descending 16/8/4/2/1
+addition tree, including independent wave64 halves, and adds no weight copy or
+scratch buffer. The largest Q8 vocabulary projection remains bandwidth-bound;
+its roughly 675 MB weight pass takes about 3 ms in the cold-ring diagnostic.
+The measured full-model gain is consequently much smaller than the best
+small-projection microbenchmark gain.
 
 ## Ideas requiring separate qualification
 

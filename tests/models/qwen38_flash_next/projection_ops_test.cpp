@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "src/models/qwen38_flash_next/kernels/rocm/kernels.hpp"
@@ -829,21 +830,36 @@ void CheckMtpOutputHead(float input_scale) {
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  const bool decode_only =
+      argc == 2 && std::string_view(argv[1]) == "--decode-only";
+  if (argc != 1 && !decode_only) {
+    std::cerr << "Usage: projection_ops_test [--decode-only]\n";
+    return 2;
+  }
   try {
-    CheckRoutedQ8Placement();
-    CheckSmallProjection(q::WeightType::kF32, 513, 2560);
-    CheckSmallProjection(q::WeightType::kF32, 96, 2560);
-    CheckSmallProjection(q::WeightType::kBF16, 129, 2560);
-    CheckSmallProjection(q::WeightType::kF16, 7, 131);
+    if (!decode_only) {
+      CheckRoutedQ8Placement();
+      CheckSmallProjection(q::WeightType::kF32, 513, 2560);
+      CheckSmallProjection(q::WeightType::kF32, 96, 2560);
+      CheckSmallProjection(q::WeightType::kBF16, 129, 2560);
+      CheckSmallProjection(q::WeightType::kF16, 7, 131);
+    }
     CheckDecodeGrouping(64, 2560);
     CheckDecodeGrouping(320, 10240);
+    CheckDecodeGrouping(10241, 320);
+    CheckDecodeGrouping(2560, 6144);
     CheckDecodeGrouping(2561, 2560);
     CheckDecodeGrouping(12289, 2560);
     CheckDecodeGrouping(65537, 2560);
     CheckMtpOutputHead(1.0F);
     // Small activations must retain products below F16's normal range.
     CheckMtpOutputHead(0.0001F);
+    if (decode_only) {
+      std::cout << "Q8 decode grouping, guards, graph replay and FP64 head "
+                   "checks pass\n";
+      return 0;
+    }
     bool ok = true;
     // Ragged batch and rows against the 128-wide macro tiles, the 64-token
     // tile below 96, and the model's ssm_out / shexp_down widths.
