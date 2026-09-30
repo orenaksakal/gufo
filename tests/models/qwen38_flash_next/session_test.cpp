@@ -35,11 +35,17 @@ void CheckSnapshotDuringGraphCapture(const std::shared_ptr<qfn::Model>& model) {
   const auto mode = gufo::core::SessionMode::kAutoregressive;
   auto decoding = model->CreateSession(mode, 128, &error);
   auto reference = model->CreateSession(mode, 128, &error);
-  auto frozen = model->CreateSession(mode, 128, &error);
+  auto frozen = model->CreateSession(mode, 6145, &error);
   Require(decoding && reference && frozen, error);
   const auto prompt = model->Tokenize("Continue: red, blue, red, blue,");
-  for (auto* session : {decoding.get(), reference.get(), frozen.get()})
+  for (auto* session : {decoding.get(), reference.get()})
     Require(session->Sync(prompt, &error), error);
+  // Exercise parallel host-page population while a peer captures its graph,
+  // with a snapshot large enough to take the deep-context allocation path.
+  std::vector<std::int32_t> frozen_prompt(6143);
+  for (std::size_t i = 0; i < frozen_prompt.size(); ++i)
+    frozen_prompt[i] = prompt[i % prompt.size()];
+  Require(frozen->Sync(frozen_prompt, &error), error);
   const auto expected_snapshot = frozen->SaveSnapshot(&error);
   Require(expected_snapshot != nullptr, error);
 

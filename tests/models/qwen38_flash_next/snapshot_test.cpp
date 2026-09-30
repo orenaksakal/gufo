@@ -1,13 +1,16 @@
 // Session snapshot round trips: a restored session must continue exactly
 // like the session it was captured from, in memory and through the
 // persistent byte form, at a prompt boundary and mid-decode.
+#include <charconv>
 #include <chrono>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "src/core/crypto/sha256.hpp"
 #include "src/core/sampling.hpp"
 #include "src/models/qwen38_flash_next/engine.hpp"
 
@@ -71,15 +74,25 @@ double Millis(std::chrono::steady_clock::time_point start) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 5 || std::string_view(argv[1]) != "--model" ||
-      std::string_view(argv[3]) != "--mtp-model") {
-    std::cerr
-        << "Usage: snapshot_test --model FIRST.gguf --mtp-model MTP.gguf\n";
+  if ((argc != 5 && argc != 7) || std::string_view(argv[1]) != "--model" ||
+      std::string_view(argv[3]) != "--mtp-model" ||
+      (argc == 7 && std::string_view(argv[5]) != "--depth")) {
+    std::cerr << "Usage: snapshot_test --model FIRST.gguf --mtp-model MTP.gguf "
+                 "[--depth N]\n";
     return 77;
   }
   try {
     std::string error;
-    constexpr std::uint32_t kContext = 8192;
+    std::uint32_t depth = 4095;
+    if (argc == 7) {
+      const std::string_view value(argv[6]);
+      const auto [end, status] =
+          std::from_chars(value.data(), value.data() + value.size(), depth);
+      Require(status == std::errc{} && end == value.data() + value.size() &&
+                  depth >= 4095 && depth <= 258047,
+              "depth must be between 4095 and 258047 tokens");
+    }
+    const std::uint32_t kContext = depth + 4097;
     auto model = qfn::Model::Load(argv[2],
                                   {.max_context = kContext,
                                    .mtp_model_path = argv[4],
@@ -92,7 +105,7 @@ int main(int argc, char** argv) {
     Require(!pattern.empty(), "empty prompt pattern");
     // Partial prefill batch and three unpooled raw indexer rows at the end
     // of the ring. Continuing (and speculative rollback) crosses its wrap.
-    std::vector<std::int32_t> prompt(4095);
+    std::vector<std::int32_t> prompt(depth);
     for (std::size_t i = 0; i < prompt.size(); ++i)
       prompt[i] = pattern[i % pattern.size()];
     const sampling::SamplingConfig config{
@@ -117,6 +130,8 @@ int main(int argc, char** argv) {
     std::cout << "snapshot tokens=" << prompt.size()
               << " bytes=" << at_prompt->SizeBytes() << " save_ms=" << save_ms
               << "\n";
+    std::cout << "snapshot_sha256="
+              << gufo::crypto::Sha256Hex(at_prompt->bytes()) << '\n';
 
     const Decoded expected = Decode(*origin, kTokens, config, 8);
     Require(expected.stats.drafted > 0, "MTP did not draft");

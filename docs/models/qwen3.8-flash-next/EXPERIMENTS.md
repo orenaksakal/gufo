@@ -59,6 +59,8 @@
 | Sparse attention tiles cut across selection windows | Retained; distribute tiles across splits using a 64-block carry, keeping four resident blocks/CU. Independent review: AR +6.7% at 32K and +16.5% at 128K, d0 unchanged. Same keys, reassociated FP32 sums; FP64 operator and model-level rounding checks pass. [Evidence](artifacts/attention-tiles-review.json). |
 | Whole-tile carry across windows | Rejected: same output, but 16.5 KiB of LDS cost a resident block per CU and slowed d2K eight-row verification 8.5%. |
 | MTP-anchored prompt lookup (Framework fork) | Retained for greedy text: four-token committed-history match, up to six additional target-verified proposals, lazy 256 KiB/session index. Full-logit AR and snapshot gates pass; sampled/image paths bypass lookup. Copy acceptance is excluded from deeper MTP acceptance and batch timing calibration. [Machine measurements and OpenCode setup](FRAMEWORK.md). |
+| Ordinary-page snapshots with parallel prefault | Rejected: faster snapshot capture, but the first matched 32K/133K HTTP turns were 0.8–2.6% slower overall. Transfer-only timings omitted allocation release and other request work; complete-request time remains the retention gate. Snapshot bytes and sampled restore remained exact. |
+| Parallel huge-page snapshot population (Framework fork) | Retained for buffers ≥256 MiB: four bounded CPU workers populate the existing allocation before HIP copies, with demand-paging fallback. 133K-prefix HTTP turns improve 3.5–3.6%, checkpoint capture 43–44%; 32K and short tg128 controls are stable. An 8 GiB idle-memory fixture improves whole turns 2.2–5.2%. All 18 measured branch completions and cache counts match. [Evidence](artifacts/framework-snapshot-review.json). |
 
 The Framework copy-code profile isolates inference after loading (CLI, 1,068
 prompt tokens / 128 output tokens, one trace per binary). Kernel launches fall
@@ -68,6 +70,16 @@ GPU-busy fractions are 86.8% / 87.9%. Quantized-vector projection time falls
 MTP-support launches fall 224 → 46. Both traces emit identical token-ID hashes.
 These instrumented observations explain the mechanism; retained speed claims
 come from separate warmed, unprofiled HTTP runs.
+
+The follow-up sampled/thinking code-edit profile uses a separate C1 CLI run
+(context 4,096; 1,128 prompt / 128 output tokens; temperature 1, top-p .95,
+top-k 20, seed 73). Excluding loading, GPU-busy time is 3,298.7 ms in a
+3,797.9 ms inference span. From the first one-token embedding onward, including
+draft catch-up, the decode tail is 87.8% GPU-busy. Dense quantized-vector
+projections consume **47.2%** of that tail's kernel time, grouped MoE gate/up
+**21.5%**, and other quantized MoE projections **14.1%**. This prioritizes exact
+projection reuse/GEMV work for the next iteration; it is not a measured speedup.
+[Profile scope and stage totals](artifacts/framework-snapshot-review.json).
 
 Separate d32K pp2048 profiling attributes 29.1% of kernel time to MoE, 34.9%
 to dense projections and 12.6% to attention/indexing. Final-tile catch-up

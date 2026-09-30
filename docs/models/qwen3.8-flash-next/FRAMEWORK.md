@@ -10,6 +10,11 @@ copy/edit decoding **13.1% / 18.9%**, and complete HTTP request time **7.8% /
 hashes/counts match upstream. [Benchmark table](BENCHMARKS.md#framework-fork-coding-fixtures)
 and [bounded evidence](artifacts/framework-review.json).
 
+The next iteration reduces complete **133K-prefix turns by 3.5–3.6%** relative
+to that prompt-lookup fork, including sampled turns. Parallel preparation of
+large snapshot buffers cuts checkpoint capture about **43–44%**; 32K controls
+are stable. [Long-turn results](BENCHMARKS.md#framework-fork-long-turn-checkpoints).
+
 ## Build on this machine
 
 ```sh
@@ -142,3 +147,62 @@ an untested image path, never a quality pass.
 Exact replay is a regression criterion against the same quantized Gufo model.
 It does not establish equivalence to the unquantized original model; upstream's
 [quality report](QUALITY.md) records those separate qualification limits.
+
+## Optimization roadmap
+
+1. **Long-turn checkpoint latency.** Measure the complete request, including
+   fresh snapshots, at 32K and 133K+ depth. Separate first-touch/page-compaction
+   stalls from transfer time; compare snapshot bytes and restored sampled state.
+2. **Sampled decoding.** The sampled/thinking code-edit trace puts 47.2% of
+   decode-tail kernel time in dense quantized-vector projections, with 87.8%
+   GPU-busy time. Target exact projection reuse/GEMV improvements, and profile
+   CPU filtering before changing it. Retain FP64 probabilities and seeded replay.
+3. **Deep prefill.** Use pp2048/tg128 controls at 32K, expanding to 128K after a
+   win. Existing profiles put dense projections and routed experts ahead of
+   attention/indexing; benchmark complete turns after operator qualification.
+4. **Coding-task evidence.** Add bounded, executable repository-edit tasks with
+   test-based success criteria, tool-call counts and total completion time.
+   Keep synthetic replay fixtures for precise regression diagnosis.
+
+Every retained change uses matched production builds on this toolchain and
+the 196,608-token deployment capacity. The OpenCode input/output reserves and
+126K+ history requirement are qualification gates for each iteration.
+
+### Long-turn checkpoint measurements
+
+The turn driver appends 2,187 new tokens to a cached coding/tool history. Each
+branch has a distinct request so it captures a fresh checkpoint. It measures
+one warmup and three greedy/sampled turns, compares completion hashes and token
+counts, and records complete HTTP wall time separately from snapshot time.
+The 128-token output budget permits natural EOS: this measures bounded turn
+latency, rather than fixed-length decode throughput or coding-task success.
+
+```sh
+# Run each depth against the saved production baseline, then the candidate.
+python3 tools/qwen-flash/framework-turn-bench.py --depth 32768 \
+  --output artifacts/framework/turn-baseline-32k.json
+python3 tools/qwen-flash/framework-turn-bench.py --depth 32768 \
+  --compare artifacts/framework/turn-baseline-32k.json \
+  --output artifacts/framework/turn-candidate-32k.json
+# Repeat both arms with --depth 133120 and distinct output paths.
+```
+
+For a controlled busy-desktop case, add `--resident-mib 8192` to **both** arms.
+This holds 8 GiB of ordinary host pages idle after cold prefill, leaving at
+least 12 GiB of available-memory headroom at allocation. Use a local, exclusive
+server; the available-memory and compaction counters describe the entire host.
+
+The allocation/transfer microbenchmark also measures release time and checks
+every destination byte. Its standalone numbers are diagnostic, not HTTP speed:
+
+```sh
+tools/bench/build.sh tools/qwen-flash/snapshot_transfer_bench.hip
+/tmp/snapshot_transfer_bench 1024
+/tmp/snapshot_transfer_bench 4096
+```
+
+The existing `qwen38_flash_next_snapshot_test` accepts `--depth 32767` after
+the model/MTP arguments and prints a hash of the complete serialized snapshot.
+It checks full-logit restoration, persistent bytes, sampled continuation,
+deferred residual/RNG replay and rejection of malformed snapshots. The session
+test also captures a large frozen peer during decode graph capture.

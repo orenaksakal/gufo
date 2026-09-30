@@ -37,6 +37,39 @@ bounded EOS continuations are qualification cases, not tg128 speed samples.
 [Retained timings, hashes and qualification](artifacts/framework-review.json).
 The upstream reference tables below retain their original dates and toolchain.
 
+## Framework fork: long-turn checkpoints
+
+September 30, 2026 UTC; prompt-lookup fork `49306f3` versus parallel snapshot
+page population. Same production toolchain/weights, C1, context **196,608**,
+MTP ceiling seven, thinking off, seed 73. Each distinct branch reuses the cached
+prefix and prefills 2,187 new tokens. One warmup and three measured turns per
+row; medians below. Positive reduction means a shorter complete HTTP request.
+
+| Cached prefix | Mode | Extra resident RAM | Snapshot ms, before → after | HTTP wall ms, before → after | Wall reduction |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 32,829 | Greedy | 0 | 67.4 → 41.1 | 3,682.9 → 3,657.9 | 0.7% |
+| 32,829 | Sampled | 0 | 65.4 → 40.2 | 1,936.2 → 1,939.2 | −0.2% |
+| 133,131 | Greedy | 0 | 201.5 → 114.8 | 2,444.1 → 2,355.7 | 3.6% |
+| 133,131 | Sampled | 0 | 198.9 → 111.7 | 2,495.1 → 2,407.0 | 3.5% |
+| 133,131 | Greedy | 8 GiB | 213.5 → 121.5 | 2,505.4 → 2,374.7 | 5.2% |
+| 133,131 | Sampled | 8 GiB | 195.1 → 132.3 | 2,505.1 → 2,450.6 | 2.2% |
+
+All **18/18** completion hashes, prompt/output counts and cached-token counts
+match. Sampled requests use temperature 1, top-p 0.95, top-k 20. The 128-token
+budget permits EOS: measured outputs are 90/126 greedy and 6/16 sampled at 32K,
+and 18/25/54 greedy and 6/22/26 sampled at 133K. These are bounded turn-latency
+measurements, not fixed-tg128 throughput or completed coding-task scores.
+
+The 8 GiB fixture holds idle ordinary host pages to model a busy desktop;
+host memory pressure and compaction are recorded. Small tg128 controls remain
+stable: prose **37.40 → 37.31**, sampled code **67.37 → 67.15** decode tok/s,
+with all six outputs exact. Snapshot population starts at 256 MiB, using four
+workers including the caller. It retains huge-page advice and falls back to
+normal demand paging on page-population failure.
+
+[Reproduction](FRAMEWORK.md#long-turn-checkpoint-measurements) ·
+[Timings, hashes and qualification](artifacts/framework-snapshot-review.json).
+
 ## Single user, autoregressive
 
 Approximately pp2048 / tg128; depth is the cached prefix in tokens.

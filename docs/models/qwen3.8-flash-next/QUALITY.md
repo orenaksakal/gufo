@@ -84,6 +84,30 @@ No vision sidecar is installed on this machine, so local image qualification is
 unavailable. The upstream vision gap described above still applies.
 Reproduction and HTTP/OpenCode results: [Framework guide](FRAMEWORK.md).
 
+## Framework snapshot population
+
+Parallel page population is qualified against the prompt-lookup fork `49306f3`
+on the same local production toolchain and weights. The independent transfer
+oracle checks every byte of 1/4 GiB destinations; model checks cover serialized
+state and seeded replay.
+
+| Check | Result |
+| --- | --- |
+| Standalone transfer | All 48 shape/advice/worker/repetition cases copy the expected bytes exactly; allocation preparation, transfer and release timed separately |
+| Complete 32K snapshot | At 32,767 tokens, all 1,019,197,388 serialized bytes have the same SHA256 as the baseline |
+| Snapshot round trips | Full logits, fresh/used sessions, persistent byte form, sampled continuation, deferred residual/RNG, extension and malformed-payload rejection pass |
+| Concurrent capture | A frozen 6,143-token peer takes the parallel-population path during graph capture; snapshot bytes and captured/replayed logits exact |
+| Batch state | C2/C4/C6/C8 full logits, tokens and RNG exact; cancellation, rollback, independent state and sampled residual checks pass |
+| Long production turns | 18/18 measured completion hashes, prompt/output counts and cache counts exact at 32K/133K prefixes, including the 8 GiB resident-memory fixture |
+| Short controls | Six tg128 prose/sampled-code completion hashes and counts exact |
+| OpenCode HTTP contract | All eight long-history, greedy/sampled replay, streamed reasoning/tool-call, tool-result and constrained-JSON cases match the prior fork |
+| Cancellation and continuation | Both greedy/content and sampled/reasoning three-turn cases pass; resume reuses 602/648 tokens and prefills only 13/11 |
+
+These remain bounded quantized-model regression checks. Long branch outputs
+can reach EOS before the 128-token budget. The existing vision qualification
+limits above apply. [Bounded evidence](artifacts/framework-snapshot-review.json)
+and [reproduction](FRAMEWORK.md#long-turn-checkpoint-measurements).
+
 ## Benchmark method
 
 Gufo single-user TG refreshed September 27, 2026 (`f797b5b`); PP and other

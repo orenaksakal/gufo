@@ -5,11 +5,14 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstring>
 #include <limits>
 #include <optional>
+#include <system_error>
+#include <thread>
 #include <type_traits>
 
 #include "src/core/gguf_reader.hpp"
@@ -447,18 +450,46 @@ bool Session::RestoreSnapshot(std::span<const std::uint8_t> payload,
 
 SessionSnapshot::SessionSnapshot(std::uint64_t size)
     : data_(new std::uint8_t[size]), size_(size) {
-  // Snapshot copies first-touch hundreds of MiB. Let Linux back the interior
-  // with transparent huge pages instead of faulting one 4 KiB page at a time.
-  // Advise only complete pages belonging to this allocation; this is optional
-  // and does not pin memory or change the serialized payload.
+  // Populate deep snapshot destinations before HIP's pageable transfer path
+  // faults small pages serially. Bounded parallel faults retain huge-page
+  // backing and its cheap release, without pinning or another payload copy.
+  // Advise only complete pages belonging to this allocation.
   const long page = sysconf(_SC_PAGESIZE);
   if (page > 0) {
     const auto address = reinterpret_cast<std::uintptr_t>(data_.get());
     const auto skip = (page - address % page) % page;
     if (size > skip) {
       const auto length = (size - skip) / page * page;
-      if (length != 0)
+      if (length != 0) {
         (void)madvise(data_.get() + skip, length, MADV_HUGEPAGE);
+        // Pageable HIP destinations otherwise first-touch thousands of small
+        // pages in the transfer path. Populate the existing allocation before
+        // copying, with bounded CPU workers.
+        // Failure only leaves ordinary demand paging for the later copy.
+        constexpr std::size_t kChunkBytes = 16ULL << 20;
+        if (length >= 16 * kChunkBytes) {
+          std::atomic<std::size_t> next{0};
+          const auto populate = [&] {
+            for (;;) {
+              const auto offset =
+                  next.fetch_add(kChunkBytes, std::memory_order_relaxed);
+              if (offset >= length)
+                return;
+              (void)madvise(data_.get() + skip + offset,
+                            std::min(kChunkBytes, length - offset),
+                            MADV_POPULATE_WRITE);
+            }
+          };
+          std::array<std::jthread, 3> workers;
+          try {
+            for (auto& worker : workers)
+              worker = std::jthread(populate);
+          } catch (const std::system_error&) {
+            // The calling thread can finish when a worker cannot start.
+          }
+          populate();
+        }
+      }
     }
   }
 }
