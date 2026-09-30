@@ -1,0 +1,95 @@
+{
+  "schema": "gufo.framework-task-multifile-review.v1",
+  "recorded_at_utc": "2026-09-30T06:53:28.966956+00:00",
+  "runtime_revision": "9a3f88a",
+  "binary_sha256": "0c52a5389e1b9d2f832178ab3e1aa404fa5d7ef04190db60a2092cda0a47225a",
+  "opencode_version": "v2.0.20",
+  "settings": {
+    "temperature": 0,
+    "seed": 73,
+    "thinking": false,
+    "max_steps": 10,
+    "context_capacity": 196608,
+    "output_limit": 2048,
+    "timeout_seconds": 240,
+    "grader_timeout_seconds": 20
+  },
+  "method": "One fresh repository per task, private OpenCode server/configuration/database. Only listed sources are editable. The external grader combines generated editable sources with original supporting files and original tests. All original fixtures fail; independent reference implementations pass. Reference code is never copied into the model's fixture.",
+  "scope": "Three bounded small-repository task observations on the retained runtime, one trial each. Wall time includes CLI startup, inference and tools, excluding external grading. Fresh paths and tool trajectories differ from prior runs; no matched inference speedup or general coding-quality score is claimed.",
+  "passed_tasks": 3,
+  "total_tasks": 3,
+  "external_test_methods_passed": 12,
+  "tests_and_support_unchanged": true,
+  "fixture_validation": {
+    "failing_originals": 3,
+    "passing_independent_references": 3,
+    "rejected_pagination_mutations": [
+      "falsy-cursor", "no-cycle-detection", "shared-query", "fetch-mutation-leak",
+      "ignore-initial-cursor", "drop-empty-pages", "last-duplicate-wins", "sorted-results"
+    ]
+  },
+  "cases": {
+    "config-bounds": {
+      "prompt_sha256": "8b3a7251d2b2f5e6787401cb32885a482c2bc9fdc1d98a594f0cb6a52c7b5a73",
+      "tests_sha256": "d37d228c70ce4840dc3b6933495bb76b9ae32b5dc3e99dbda3e13eab0b7bc3f5",
+      "editable": ["solution.py"],
+      "wall_ms": 17093.053040,
+      "tool_calls": 4,
+      "tool_counts": {"read": 2, "write": 1, "shell": 1},
+      "tool_errors": 0,
+      "command_failures": 0,
+      "model_steps": 4,
+      "test_methods": 3,
+      "final_files_sha256": {"solution.py": "91a254c9c65b75ceffd1426844b6d3fcaecf2632a7356ebf743aca648b737d3e"}
+    },
+    "lru-recency": {
+      "prompt_sha256": "6d48cf205b06feb43af6f0e8a284e2c6d7314b4bbafb9b73a3750e37b2e7be1a",
+      "tests_sha256": "7108c9e0434574617e76565f16f2e33e55c7270429c7d6bed9aafa483d4a4da3",
+      "editable": ["solution.py"],
+      "wall_ms": 20594.134075,
+      "tool_calls": 7,
+      "tool_counts": {"read": 2, "write": 1, "shell": 3, "edit": 1},
+      "tool_errors": 1,
+      "command_failures": 1,
+      "model_steps": 7,
+      "test_methods": 4,
+      "recovery": "The first compound shell command was denied by the fixed test-command allowlist. A subsequent permitted test run exposed a missing existing-key value update. The model repaired it and reran successfully without user intervention.",
+      "final_files_sha256": {"solution.py": "daeb67c1344a07f2c6ff0fda971f0dc474bdde63be6744421b0d503435c0508e"}
+    },
+    "cursor-pages": {
+      "contract": "Two-file client repair: continue through empty pages and opaque empty cursors; honor the initial cursor; reject cycles before refetch; preserve caller parameters and isolate fetch mutations; collect first-seen IDs in encounter order without modifying items.",
+      "prompt_sha256": "0ccaa672e60ef11464192eca17bae0af7c1c9822efd5dbfc172e60bfbb7f4ae5",
+      "tests_sha256": "4e2571b8ec9307cc7b32092f4ca768b1e5cb66322ead7a94bc061574ca5ebd45",
+      "editable": ["pageclient/paging.py", "pageclient/client.py"],
+      "wall_ms": 22412.325790,
+      "tool_calls": 7,
+      "tool_counts": {"read": 4, "write": 2, "shell": 1},
+      "tool_errors": 0,
+      "command_failures": 0,
+      "model_steps": 6,
+      "test_methods": 5,
+      "final_files_sha256": {
+        "README.md": "1b9a0b278b4e003cce84462ac41f4a7e2471c060e3c2e27e97c94191a992016a",
+        "pageclient/__init__.py": "3772077a07f306d4ff394fd097af00cd35530d85299d065fa2d24963112871fb",
+        "pageclient/paging.py": "40bd56dbba019bf6e61f499dff360019760f471114f3e3ca8aa4908ed0a37301",
+        "pageclient/client.py": "5564378c6b24aecf5943d1c68e80389df1a1c59115b2d79a0196285d00aa96b4"
+      }
+    }
+  },
+  "harness_changes": "Version 2 reports allowlisted per-file hashes, grades multi-file projects with original support files, verifies support immutability, and accepts --cases for focused checks. Existing normalization/LRU prompts and contract tests are preserved.",
+  "source_sha256": {
+    "tools/qwen-flash/framework-task-bench.py": "49886c085953ab357f7e0f3cd795ffd20b8273e12b67e18b68bce94a246dca60"
+  },
+  "raw_artifacts_sha256": {
+    "artifacts/framework/task-multifile-retained.json": "4f62246e0bae09b067d86c38fcf9e9f1c66ee7fa4b09b92ecd4c9c5183ddfc51",
+    "artifacts/framework/task-multifile-run.log": "c89b0dda8bc023ac9f45e7dc7157c7142dd84b7dfe3af51e8e64d0e6ed95279f",
+    "artifacts/framework/task-multifile-fixture-check.json": "cfcbd1ac72d97e86bb2ea7c07e461fd50fcc864faa07515345a6aa43e74df09f",
+    "artifacts/framework/task-multifile-fixture-check.py": "3f4596e8e5b1edf5badc8e88e406d0bd230a33c5562ed6aa56512bd7720a821c",
+    "artifacts/framework/task-multifile-prepared-final.json": "5268f2ea2495f933cf3b2e78d51e6e2b6e9dd53209456cee570548e740eb9020",
+    "artifacts/framework/projection-restored-deployment.json": "4326505a719f95a4cb97d52447d534a2c7f6c131534c67b05e7acc0e746fa4f2",
+    "artifacts/framework/projection-restored-dev-build.log": "6ff71bb3c14f1ad8f3ed16c1fe52c37f94c00922aa4bc5a98eab4c112d35fe35",
+    "artifacts/framework/task-multifile-retained-config-bounds.jsonl": "d2af240902b027b37cb67cb029423173f081ccd539cdd1c82b4ca42a64523473",
+    "artifacts/framework/task-multifile-retained-lru-recency.jsonl": "8b657fe6c81ce81762a8c766a997418eb81213dac581060f1085c31f728e398d",
+    "artifacts/framework/task-multifile-retained-cursor-pages.jsonl": "a65bef16764ba557c3807479e823d37e97795d306813972b922eda8274e7f6b6"
+  }
+}

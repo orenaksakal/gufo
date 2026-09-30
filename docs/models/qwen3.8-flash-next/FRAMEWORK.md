@@ -290,8 +290,9 @@ unaligned starts at 2K, 32K, 64K and 133K.
 ### Executable OpenCode tasks
 
 The task driver exercises the actual V2 CLI in fresh miniature repositories:
-configuration normalization and LRU behavior. Each starts with failing tests;
-the external grader uses the original tests against the resulting source file.
+configuration normalization, LRU behavior and a two-file paginated client.
+Each starts with failing tests; the external grader uses the original tests
+against the resulting editable sources and original supporting files.
 It records success, tool calls/errors, model steps, source/test/event hashes and
 wall time including client startup and tools, excluding external grading.
 The fixtures use greedy, thinking-off requests, seed 73, a 2048-token response
@@ -305,8 +306,11 @@ python3 tools/qwen-flash/framework-task-bench.py --label candidate \
 
 Run against an exclusive server. The driver uses a private OpenCode server,
 configuration and database under `/tmp/opencode`; each task may edit only its
-`solution.py` and run its local `unittest` command. `--prepare-only` validates
+listed source files and run its local `unittest` command. The pagination task
+covers opaque empty cursors, cycle detection before refetch, fresh request
+parameters and first-occurrence result ordering. `--cases cursor-pages` selects
+that task alone. `--prepare-only` validates
 the intentionally failing fixtures without model requests. Raw JSONL events,
 stderr logs and temporary repositories are retained for inspection.
 The driver resets the logical `PWD` and inherited OpenCode settings so nested
-invocations use the fixture's Location. [Current results](artifacts/framework-task-review.json).
+invocations use the fixture's Location. [Current multi-file results](artifacts/framework-task-multifile-review.json).

@@ -1,0 +1,107 @@
+{
+  "schema": "gufo.framework-projection-review.v1",
+  "recorded_at_utc": "2026-09-30",
+  "baseline_revision": "9a3f88a",
+  "baseline_binary_sha256": "0c52a5389e1b9d2f832178ab3e1aa404fa5d7ef04190db60a2092cda0a47225a",
+  "machine": "Framework Desktop, Ryzen AI Max+ 395 / Radeon 8060S gfx1151, 128 GB",
+  "toolchain": "gufo-dev:rocm10; GCC 16.2.1-2.fc44, amdrocm-core-devel10.0-gfx1151-10.0.0-4, HIP 7.15.26333-0000000, AMD Clang 23.0.0git",
+  "narrow_q8_wmma": {
+    "decision": "Rejected: no speed gain on the affected four-row SSM projection or scalar control. No production dispatch changed.",
+    "shape": {
+      "output_rows": 16384,
+      "columns": 2560,
+      "cold_weight_ring_slots": 2,
+      "weight_bytes_per_slot": 44564480,
+      "allocation": "hipMalloc, matching production dense weights"
+    },
+    "method": "Five interleaved passes, 32 launches per pass; median HIP-event duration. Standalone microbenchmark, not HTTP latency.",
+    "one_input_us": {"vector": 201.534, "wmma_eight_waves": 215.056, "wmma_four_waves": 219.537},
+    "four_inputs_us": {"vector": 203.780, "wmma_eight_waves": 216.893, "wmma_four_waves": 214.737},
+    "quality": "Every output byte and guard matches the original vector kernel for both ring slots and variants. Finite outputs and sampled independent FP64 dequantized-dot checks pass.",
+    "raw_sha256": {
+      "artifacts/framework/q8_narrow_bench.hip": "955f0c95cdb3f261aa8f866322f8e4550f059fe6b5af2ae6385c7a925498cc63",
+      "artifacts/framework/narrow-q8-first.log": "7f50fe2166537d5b79669e65eb878151908ff916f9ab6c123b47c6689848074f",
+      "artifacts/framework/narrow-q8-build.log": "19c75868d0d90af9e41a07b24651dae3892deda0053ae7fafea41caa5ef1ab65",
+      "artifacts/framework/narrow-q8-resources.txt": "cc418392a6c435107720a8c3516c69d19dd321645592ced277e5b07eac9b8b9f"
+    }
+  },
+  "narrow_q4_wave64": {
+    "decision": "Rejected: sampled complete-request gains are smaller than the observed run-to-run spread, with a slower prose control in confirmation. Production kernels restored to 9a3f88a.",
+    "mechanism": "Use the existing wave64 Q4 gate/up body for three-to-eight-row verification, retaining independent 32-lane dot reductions and direct expert groups.",
+    "candidate_binary_sha256": "6a240877dc06cd9cd69e3cd72935f58190d292e651bdf0914f3c51d94a77ff2a",
+    "http_settings": {
+      "context_capacity": 196608,
+      "concurrency": 1,
+      "draft_ceiling": 7,
+      "seed": 73,
+      "thinking": false,
+      "cache_prompt": false,
+      "output_tokens": 128,
+      "sampled_temperature": 1,
+      "sampled_top_p": 0.95,
+      "sampled_top_k": 20,
+      "warmups_per_case": 1
+    },
+    "initial_baseline_first": {
+      "samples_per_case_per_arm": 3,
+      "prose_wall_ms": {"baseline": 4791.832535, "candidate": 4791.425336},
+      "sampled_wall_ms": {"baseline": 2860.002000, "candidate": 2851.509539},
+      "sampled_wall_reduction_percent": 0.296939,
+      "sampled_decode_tps": {"baseline": 66.925094, "candidate": 67.308823}
+    },
+    "clean_candidate_first_confirmation": {
+      "samples_per_case_per_arm": 5,
+      "prose_wall_ms": {"baseline": 4785.513103, "candidate": 4799.434905},
+      "prose_wall_reduction_percent": -0.290916,
+      "sampled_wall_ms": {"baseline": 2854.844169, "candidate": 2851.794677},
+      "sampled_wall_reduction_percent": 0.106818,
+      "sampled_decode_tps": {"baseline": 67.107334, "candidate": 67.262595},
+      "sampled_wall_range_ms": {"baseline": [2850.560679, 2874.010075], "candidate": [2843.912206, 2869.628329]}
+    },
+    "exploratory_reverse": "A separate five-fixture reverse run overlaps offline ISA compilation. Its 30 responses remain replay observations, but its timings are excluded from the decision; the clean confirmation above replaces that timing evidence.",
+    "quality": {
+      "routed_operator": "Exact grouping, SwiGLU, ragged rows, output guards and nonfinite checks pass.",
+      "session": "All 23 sampling configurations pass for AR/MTP, C2 and budget replay, independent execution modes, and peer snapshot/capture/replay.",
+      "http_responses_exact": 62,
+      "http_matched_pairs": 31,
+      "sampled_draft_counts_exact": true,
+      "scope": "Quantized-runtime regression checks; no new general coding-quality or unquantized-model equivalence claim. Candidate not retained or qualified at deep context."
+    },
+    "profile": {
+      "scope": "Separate sampled/thinking CLI traces, 1128 prompt and 128 output tokens, temperature 1/top-p .95/top-k 20/seed 73. Loading excluded; decode tail starts at the first one-token embedding, including predictor catch-up.",
+      "token_ids_sha256": "af7eb9b43dfbb50788c90dd1dc4fb7e9852e0485d0d0295a1e6b5ee5932df76d",
+      "inference_dispatches_each": 78005,
+      "decode_tail_dispatches_each": 76299,
+      "inference_kernel_ms": {"baseline": 3290.639775, "candidate": 3285.095764},
+      "inference_wall_ms": {"baseline": 3786.833186, "candidate": 3770.455379},
+      "decode_tail_kernel_ms": {"baseline": 2466.105617, "candidate": 2457.691020},
+      "decode_tail_busy_ms": {"baseline": 2466.105494, "candidate": 2457.689065},
+      "decode_tail_wall_ms": {"baseline": 2815.551105, "candidate": 2793.560579},
+      "grouped_moe_ms": {"baseline": 529.516881, "candidate": 524.508365},
+      "interpretation": "About 5 ms less grouped-expert GPU time in this single trace; instrumented timings do not establish an unprofiled HTTP gain."
+    },
+    "raw_sha256": {
+      "artifacts/framework/wave64-narrow-baseline-short.json": "9552568de149bf77a14885ffbd1426d49bacfa99d969079fe92e8f2158b24d3e",
+      "artifacts/framework/wave64-narrow-candidate-short.json": "9b583f0590f2567a59073f7b8e2e7c9d5f897db4703cfab1d8340e10653b5a4e",
+      "artifacts/framework/wave64-narrow-baseline-reverse.json": "6d4b02f846baf199bc6309d9a1102cd931b4cd64515b0464973b95e2acf3b9fe",
+      "artifacts/framework/wave64-narrow-candidate-reverse.json": "046f88f7652424066abc70590debca1652d0554e2921463d646ac810cf143570",
+      "artifacts/framework/wave64-narrow-baseline-confirm.json": "59f11d74a21255de37130fe65ac112111c518e484a671e7c1c7f1aaef13996ea",
+      "artifacts/framework/wave64-narrow-candidate-confirm.json": "246fc0c5d952975d9c76e60e4e51e51ec64fb5252b8d5ffa1b538614d8efa9a6",
+      "artifacts/framework/wave64-narrow.patch": "f6513a5d2d8b516cfa1488ed3c626fd2b54503ce8e7dc17616ccea1d3abea9ea",
+      "artifacts/framework/wave64-narrow-routed.log": "6340b0072561d1c6eb7e59099359e586b0dd132fe6fe01293550e58e457c624d",
+      "artifacts/framework/wave64-narrow-sampling.log": "5108c059aecbebf37874b5193e70b60c194ef83f843e79e6c197bd15b52673d0",
+      "artifacts/framework/wave64-narrow-test-build.log": "e7d91141ecce40b4b5d80bfe4752d0850729a11980af4925f2197311a7404993",
+      "artifacts/framework/wave64-narrow-production-build.log": "40b837b7c8b6226902013e251994f82a1f3eac388b0f2ca9da4d50d12c6701fc",
+      "artifacts/framework/wave64-narrow-http.log": "377432c0bf6ad7bc286ae2f3c10873be7bdea57c7481a1f87915059caf58f71b",
+      "artifacts/framework/wave64-narrow-reverse.log": "48276a5996dfe828b7743d2a7e20e53099ada608756b14da4ee287ef1dd0c0c2",
+      "artifacts/framework/wave64-narrow-confirm.log": "ab5a0b5da5d7a6f0c50129876f691a8017609ed4deb042512c3bb29f179bac7f",
+      "artifacts/framework/wave64-profile-summary.json": "73b41d5c83d041a00c51ec3e4ca286de23a221432830f0a9e6285a2c01615a72",
+      "artifacts/framework/wave64-profile-baseline.log": "07d6838eccb4e74a2bafe2b63d50fdcaa84a8720d17b770b71387e4be9c4221d",
+      "artifacts/framework/wave64-profile-candidate.log": "bdad9ff538fa8837ef1ef81d52a4ba419bce9afa077c861a4f17c1c2af0bd393",
+      "artifacts/framework/wave64-narrow-isa-mix.txt": "3ec87c877718f777c6da02ad274f054992dd4dbfa9aaef46a201b05407bfd0c7",
+      "artifacts/framework/wave32-grouped-isa-mix.txt": "6732b68e70d4901e188acda827931dea41c8be178802b06d5708349e71cd8e80",
+      "artifacts/framework/wave64-profile-baseline/sampled_results.db": "3e645597be6f1aedb6cee092aef9468938a98b2872ea051d60a3859d1371ba48",
+      "artifacts/framework/wave64-profile-candidate/sampled_results.db": "e69ca09ef88213421292ac050340257c9228e6c557b125b9e2149c72f2a07a25"
+    }
+  }
+}

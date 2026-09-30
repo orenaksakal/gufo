@@ -194,6 +194,29 @@ long-context gates above cover state/replay separately. Initial working-director
 isolation failures and an expanded signed-input contract are recorded in the
 [task evidence](artifacts/framework-task-review.json).
 
+The follow-up harness supports allowlisted multi-file edits and external grading
+with original support files. Retained runtime `9a3f88a` passes **3/3 tasks** and
+all twelve test methods: normalization, LRU and two-file pagination. The new
+fixture covers empty cursors/pages, initial cursors, cycles before refetch,
+request-parameter isolation and first-occurrence result ordering. Independent
+reference implementations pass all three fixtures; eight deliberately broken
+pagination implementations fail. The model completes pagination in six steps
+and seven tool calls. Its LRU run recovers from one denied command and one
+failed test before passing. Tests and support files remain intact throughout.
+[Multi-file evidence](artifacts/framework-task-multifile-review.json).
+
+## Framework projection follow-up
+
+Both narrow-projection experiments are rejected on performance. The Q8
+integer-WMMA variants retain all tested output bytes/guards and pass sampled
+independent FP64 dots. The Q4 wave64 candidate passes routed grouping/SwiGLU
+checks, all 23 sampling configurations, and **62/62** measured HTTP response
+hashes/token counts across 31 pairs; sampled draft counts also match. Its
+sampled/thinking profile retains the 128-token ID hash and launch counts.
+The qualified production kernels and deployment are restored to `9a3f88a`;
+the candidate was not qualified at deep context.
+[Decisions, timings and raw hashes](artifacts/framework-projection-review.json).
+
 ## Benchmark method
 
 Gufo single-user TG refreshed September 27, 2026 (`f797b5b`); PP and other

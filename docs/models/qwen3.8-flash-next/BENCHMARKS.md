@@ -189,6 +189,21 @@ they establish bounded task success rather than a matched inference speedup.
 [Contracts and evidence](artifacts/framework-task-review.json) ·
 [Reproduction](FRAMEWORK.md#executable-opencode-tasks).
 
+A subsequent single-trial check on retained runtime `9a3f88a` expands coverage
+to a two-file paginated client. All **3/3 tasks** pass their external contracts
+with original tests and support files intact:
+
+| Task | Wall time | Model steps | Tool calls | Tool errors |
+| --- | ---: | ---: | ---: | ---: |
+| Configuration normalization | 17.09 s | 4 | 4 | 0 |
+| LRU recency/eviction | 20.59 s | 7 | 7 | 1 |
+| Two-file pagination | 22.41 s | 6 | 7 | 0 |
+
+The LRU run recovers from a denied compound command and a failing test, then
+repairs the update bug and passes. These fresh-path observations use the same
+greedy/thinking-off settings; they are not matched speed comparisons with the
+earlier trials. [Multi-file contracts and evidence](artifacts/framework-task-multifile-review.json).
+
 ## Single user, autoregressive
 
 Approximately pp2048 / tg128; depth is the cached prefix in tokens.
