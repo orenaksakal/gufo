@@ -1,0 +1,70 @@
+{
+  "schema": "gufo.framework-task-review.v1",
+  "recorded_at_utc": "2026-09-30",
+  "opencode_version": "v2.0.20",
+  "machine": "Framework Desktop, Ryzen AI Max+ 395 / Radeon 8060S gfx1151, 128 GB",
+  "runtime_qualification": "framework-boundary-review.json",
+  "binary_sha256": {
+    "baseline": "f41566f4c3abec52a0b01d74e0a732d4e97c35a79d12dcd58f3b46cd376cfcaf",
+    "candidate": "0c52a5389e1b9d2f832178ab3e1aa404fa5d7ef04190db60a2092cda0a47225a"
+  },
+  "settings": {
+    "temperature": 0,
+    "seed": 73,
+    "thinking": false,
+    "context_capacity": 196608,
+    "response_limit": 2048,
+    "max_model_steps": 10,
+    "task_timeout_seconds": 240,
+    "grader_timeout_seconds": 20
+  },
+  "method": "One fresh repository per task and arm, with private OpenCode server/configuration/database. The CLI receives a behavioral edit request and visible contract tests. Only solution.py is editable. Original tests are copied to an external grader with the resulting source. Original fixtures fail; independent known-correct solutions pass. Wall time includes client startup, inference and tools, excluding external grading.",
+  "scope": "Two bounded small-repository task checks. One trial per arm, baseline first; temporary paths and generated text can differ, so these timings do not establish a matched inference speedup or general coding-quality score.",
+  "passed_tasks": {"baseline": 2, "candidate": 2},
+  "all_tasks": {"tool_calls": 4, "tool_counts": {"read": 2, "write": 1, "shell": 1}, "tool_errors": 0, "model_steps": 4, "tests_unchanged": true, "external_grade_passed": true},
+  "cases": {
+    "config-bounds": {
+      "contract": "Copy without mutating the input; preserve unknown fields; trim names; default retries to 3; parse integers and trimmed decimal integer strings with optional +/- sign; clamp to [0,10]; reject bools, floats, malformed strings and underscores.",
+      "prompt_sha256": "8b3a7251d2b2f5e6787401cb32885a482c2bc9fdc1d98a594f0cb6a52c7b5a73",
+      "tests_sha256": "d37d228c70ce4840dc3b6933495bb76b9ae32b5dc3e99dbda3e13eab0b7bc3f5",
+      "test_methods": 3,
+      "baseline_wall_ms": 17288.816854998004,
+      "candidate_wall_ms": 15845.776927977568,
+      "baseline_source_sha256": "b3ee38cba2b026c4f957a953d6107b226d85e4051a43f76ff307aac3a14a77f8",
+      "candidate_source_sha256": "e2c349a7dbb501e39fb895255c788db688b70342f73275c4b9a93d0c22b23544"
+    },
+    "lru-recency": {
+      "contract": "Successful reads and updates refresh recency; preserve falsy stored values; evict the least recent entry; zero capacity stores nothing; negative capacity raises ValueError.",
+      "prompt_sha256": "6d48cf205b06feb43af6f0e8a284e2c6d7314b4bbafb9b73a3750e37b2e7be1a",
+      "tests_sha256": "7108c9e0434574617e76565f16f2e33e55c7270429c7d6bed9aafa483d4a4da3",
+      "test_methods": 4,
+      "baseline_wall_ms": 13992.199611995602,
+      "candidate_wall_ms": 12890.4362040048,
+      "baseline_source_sha256": "6dd027bb212997e55840f2dc178f9083c200c6df29c5f06eb31f74e6c74e4f4c",
+      "candidate_source_sha256": "6dd027bb212997e55840f2dc178f9083c200c6df29c5f06eb31f74e6c74e4f4c"
+    }
+  },
+  "harness_followups": [
+    "Initial runs inherited the parent session's logical PWD, searched the Gufo repository, and failed before editing. These are invalid task measurements. The driver now sets PWD to the fixture and removes inherited OpenCode environment settings; edit permissions use the location-relative solution.py path.",
+    "The first isolated runs passed their visible tests, but inspection exposed a missing +sign case in the normalization fixture. The previous candidate source fails that additional input. The retained contract makes signs explicit and covers plus signs and malformed/underscore inputs. Both arms pass the expanded contract above."
+  ],
+  "source_sha256": {
+    "tools/qwen-flash/framework-task-bench.py": "96a8af2b6d326d857998de640d40c23d18d32106b06ad5c9d0ac30382478f46a"
+  },
+  "raw_artifacts_sha256": {
+    "artifacts/framework/boundary-task-contract-baseline.json": "9985a1bc2f26ff0187979f4c944451bad6b6cbc0f41bb2d70f95d6ca8b8e21b4",
+    "artifacts/framework/boundary-task-contract-candidate.json": "1d80ea7ec52275fd636d95c3803163d5a623d21717d9e6499d2ede2153d850d6",
+    "artifacts/framework/boundary-task-contract.log": "65caf7b18b7b5abb59d1deb92ee9cbdfff4bf8d79171733a62a1ec68e23d0322",
+    "artifacts/framework/boundary-task-contract-baseline-config-bounds.jsonl": "5d881884a85f4e0494019697a00e15bda34c1edbb98e21e82f3a76c37626fafa",
+    "artifacts/framework/boundary-task-contract-baseline-lru-recency.jsonl": "d14c15bbaf1d4e445821ca218a3b7d74d5719e2408330138b61e9af0e2c54892",
+    "artifacts/framework/boundary-task-contract-candidate-config-bounds.jsonl": "9d51203f1a00869b4a3525a1193d72bc10338cc86df534c83c0088034236dba7",
+    "artifacts/framework/boundary-task-contract-candidate-lru-recency.jsonl": "eaf4d67ad7f4eccf72c4ce0bff75116ac826ad8fe90fbd575cde865acd12e861",
+    "artifacts/framework/boundary-tasks.log": "2dc86dadeaba2c86699221e8e8cc262e722a8f5993a6c27c2b2af27299ee380d",
+    "artifacts/framework/boundary-tasks-baseline.json": "5e3b89d54358985e24cf5619dee146979e0cd1ff061f63191f701865945d4c97",
+    "artifacts/framework/boundary-tasks-candidate.json": "fbc7eb12d2832c32e1115458d23107dbe64b722c9c8b5177d13cd1b82d214d4f",
+    "artifacts/framework/boundary-isolated-tasks.log": "6283da747206a446e6098b4adc2b22b23180e9293997b3be6330359da646a5e6",
+    "artifacts/framework/boundary-isolated-tasks-baseline.json": "ebc2f3ddd2809a8e41d4830658cfbd9348bafe37540b927f4054fffaa3093d43",
+    "artifacts/framework/boundary-isolated-tasks-candidate.json": "4954bec124a879d11d7a53d834a611428356212fc43a8bf20500f0bd82748c66",
+    "artifacts/framework/boundary-task-grader.log": "d12d811379f394eeb92b1e9f5dbdf00eaacbe6a3b2fb9eb6ce3dd892b38e9db3"
+  }
+}

@@ -267,7 +267,9 @@ void CheckPrefillChunks(const std::shared_ptr<qfn::Model>& model) {
   for (const auto [length, boundary] :
        {std::pair{136U, 94U}, std::pair{136U, 103U}, std::pair{136U, 104U},
         std::pair{136U, 127U}, std::pair{136U, 128U}, std::pair{136U, 135U},
-        std::pair{2048U, 1025U}, std::pair{4096U, 2048U}}) {
+        std::pair{2048U, 1025U}, std::pair{2049U, 2048U},
+        std::pair{2051U, 2048U}, std::pair{2059U, 2048U},
+        std::pair{2176U, 2048U}, std::pair{4096U, 2048U}}) {
     std::vector<std::int32_t> tokens(length);
     for (std::size_t i = 0; i < tokens.size(); ++i)
       tokens[i] = pattern[i % pattern.size()];
@@ -284,6 +286,17 @@ void CheckPrefillChunks(const std::shared_ptr<qfn::Model>& model) {
                 split->Sync(std::span(tokens).first(boundary), &error) &&
                 split->Sync(tokens, &error),
             error);
+    if (boundary == 2048 && length - boundary >= 8) {
+      // Equal target logits can hide a different predictor cache and change
+      // seeded p/q acceptance later. With eight kept hidden rows on each
+      // side, tail merging retains the complete serialized state.
+      const auto a = bulk->SaveSnapshot(&error);
+      const auto b = split->SaveSnapshot(&error);
+      Require(a && b, error);
+      Require(std::ranges::equal(a->bytes(), b->bytes()),
+              "prefill chunking changed snapshot bytes: length=" +
+                  std::to_string(length));
+    }
     for (unsigned step = 0; step < 4; ++step) {
       const auto logits = bulk->Logits();
       RequireExact(
@@ -299,6 +312,28 @@ void CheckPrefillChunks(const std::shared_ptr<qfn::Model>& model) {
     std::cout << "prefill chunks: length=" << length << " boundary=" << boundary
               << " four logit rows exact\n"
               << std::flush;
+    if (boundary == 2048 && length <= 2176) {
+      const sampling::SamplingConfig config{
+          .temperature = 1.0F, .top_k = 20, .top_p = 0.95F, .seed = 73};
+      const std::vector<sampling::TokenId> history(bulk->Tokens().begin(),
+                                                   bulk->Tokens().end());
+      sampling::SamplerState a(config, history), b(config, history);
+      for (std::size_t emitted = 0; emitted < 32;) {
+        qfn::Session::DecodeResult x, y;
+        Require(bulk->DecodeStep(32 - emitted, a, &x, &error, false) &&
+                    split->DecodeStep(32 - emitted, b, &y, &error, false),
+                error);
+        Require(!x.tokens.empty() && x.tokens == y.tokens &&
+                    a.rng_state() == b.rng_state(),
+                "prefill chunking changed sampled replay");
+        RequireExact(bulk->Logits(), split->Logits(),
+                     "prefill chunking changed sampled frontier logits");
+        emitted += x.tokens.size();
+      }
+      std::cout << "prefill tail: length=" << length
+                << " sampled tokens/logits/RNG exact\n"
+                << std::flush;
+    }
   }
 }
 

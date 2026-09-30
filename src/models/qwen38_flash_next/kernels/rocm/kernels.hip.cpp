@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include "src/models/qwen38_flash_next/config.hpp"
 #include "src/models/qwen38_flash_next/mtp_sampling.hpp"
 
 // HIP kernels follow the layouts and operator formulas in reference.cpp.
@@ -5784,12 +5785,35 @@ bool WmmaCausalAttention(const float* q, const float* gate,
                          std::uint32_t start_pos, std::uint32_t heads,
                          std::uint32_t kv_heads, std::uint32_t d,
                          std::uint32_t ratio, hipStream_t stream,
-                         bool last_only) {
+                         bool last_only, std::uint32_t dense_until) {
   if (heads != kWmmaQueryHeads || kv_heads != kWmmaKvHeads ||
       d != kWmmaHeadDim || ratio != kWmmaRatio || n_tokens == 0 ||
       (mask != nullptr && mask_words > kWmmaMaxMaskWords)) {
     return false;
   }
+  if (n_tokens > kPrefillChunkTokens) {
+    static_assert(kPrefillChunkTokens % kWmmaQueryRows == 0);
+    // A merged projection must not populate the sparse WMMA's formerly zero
+    // padded V lanes. Even zero probabilities can change matrix-core rounding
+    // when those future values are nonzero, especially at unaligned starts.
+    const auto first =
+        last_only ? (n_tokens - 1) / kPrefillChunkTokens * kPrefillChunkTokens
+                  : 0U;
+    for (auto row = first; row < n_tokens; row += kPrefillChunkTokens) {
+      const auto offset = static_cast<std::size_t>(row) * heads * d;
+      WmmaCausalAttention(
+          q + offset, gate ? gate + offset : nullptr, k_cache, v_cache,
+          mask ? mask + static_cast<std::size_t>(row) * mask_words : nullptr,
+          mask_words, out + offset,
+          std::min(kPrefillChunkTokens, n_tokens - row), start_pos + row, heads,
+          kv_heads, d, ratio, stream, last_only, dense_until);
+    }
+    return true;
+  }
+  // Selection was prepared for the merged batch. Each original chunk keeps
+  // its dense/sparse dispatch, including one that straddles the budget.
+  if (start_pos < dense_until && n_tokens <= dense_until - start_pos)
+    mask = nullptr;
   if (mask != nullptr) {
     constexpr std::uint32_t kPackedQueries = 4;
     const std::uint32_t first_group =

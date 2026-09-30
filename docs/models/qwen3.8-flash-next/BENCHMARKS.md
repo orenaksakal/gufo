@@ -127,7 +127,7 @@ divided by cohort wall time:
 All **66/66** completion hashes and token/cache counts match, with the requested
 physical batch widths observed. C1 summarizes both fixture types and is not
 directly comparable to either individual fixture above. These remain synthetic
-regression workloads; executable coding-task scores are a separate roadmap item.
+regression workloads; executable coding-task observations are reported below.
 
 The separate sampled/thinking CLI profile retains the same 128-token hash and
 78,005 inference launches. Decode-tail kernel time falls **2,477.5 → 2,465.0
@@ -137,13 +137,57 @@ the mechanism; the table above uses unprofiled HTTP requests.
 [Reproduction](FRAMEWORK.md#vector-reduction-measurements) ·
 [Bounded measurements and qualification](artifacts/framework-dpp-review.json).
 
-### Deep-prefill follow-up
+### Exact prefill-tail merging
 
-The September 30 32K profile and two rejected prefill experiments are recorded
-in [the experiment log](EXPERIMENTS.md) and
-[bounded evidence](artifacts/framework-prefill-review.json). No new speedup is
-retained: the 2176-token candidate fails the existing full-logit boundary gate,
-and production remains the qualified 2048-token build at 196,608 capacity.
+September 30, 2026 UTC; retained `3469f4e` runtime versus terminal-tail merging,
+same production toolchain/weights, C1, **196,608-token capacity**, thinking on,
+seed 73. Ordinary chunks remain 2048; a terminal suffix of at most 128 tokens
+shares target projection work while attention and MTP retain their original
+chunk shapes. Each branch appends 2059 tokens to the cached history. One warmup
+and three measured branches per mode; baseline first, candidate second.
+
+| Cached tokens | Mode | Prefill ms, before → after | Complete HTTP ms, before → after | Wall reduction |
+| ---: | --- | ---: | ---: | ---: |
+| 32,920 | Greedy | 1,501.9 → 1,438.1 | 3,717.6 → 3,649.0 | +1.85% |
+| 32,920 | Sampled | 1,501.3 → 1,446.2 | 4,650.9 → 4,585.5 | +1.41% |
+| 133,295 | Greedy | 1,645.9 → 1,549.9 | 3,848.6 → 3,727.2 | +3.16% |
+| 133,295 | Sampled | 1,628.1 → 1,550.3 | 4,250.6 → 4,133.4 | +2.76% |
+
+All **24/24** measured long-turn messages and token/cache counts match, as do
+sampled draft/acceptance counts. Outputs fill tg128 except the same 67-token
+deep sampled branch on both arms. All twelve matched branches are faster; a
+slow first deep greedy baseline branch is excluded by the reported median.
+
+Short controls are stable: prose **37.21 → 37.17**, sampled code **67.19 →
+67.08** decode tok/s; complete request medians change by less than 1 ms. All
+12 short responses and eight OpenCode contract responses match, for **44/44**
+measured HTTP/contract responses. The isolated one-logit-row executor probe
+uses approximately **107 MiB** more allocation; it is not total process memory.
+
+The initial wider-chunk candidates failed exactness and were rejected. The
+retained implementation preserves dense/sparse attention dispatch, padded KV
+load bounds and predictor catch-up shapes. [Diagnosis and qualification](QUALITY.md#framework-deep-prefill-follow-up)
+· [Measurements and raw hashes](artifacts/framework-boundary-review.json)
+· [Reproduction](FRAMEWORK.md#tail-merging-qualification).
+
+### Executable OpenCode edits
+
+OpenCode v2.0.20, greedy/thinking off, seed 73; one fresh small repository per
+task and arm. The external grader runs the original contract tests against the
+edited source. Both runtimes pass **2/2 tasks** with unchanged tests, four model
+steps and **four tool calls per task** (two reads, one write, one test command),
+with no tool errors.
+
+| Task | Baseline wall time | Tail-merging wall time | External tests |
+| --- | ---: | ---: | --- |
+| Configuration normalization | 17.29 s | 15.85 s | 3 methods, including signed inputs and invalid-value subcases |
+| LRU recency/eviction | 13.99 s | 12.89 s | 4 methods |
+
+Wall time includes client startup and agent tools, excluding external grading.
+These single trials use fresh temporary paths and can generate different text;
+they establish bounded task success rather than a matched inference speedup.
+[Contracts and evidence](artifacts/framework-task-review.json) ·
+[Reproduction](FRAMEWORK.md#executable-opencode-tasks).
 
 ## Single user, autoregressive
 

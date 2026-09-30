@@ -1,0 +1,239 @@
+{
+  "schema": "gufo.framework-boundary-review.v1",
+  "baseline_revision": "3469f4e974ce8c9bae3be6da033562350a077e9f",
+  "recorded_at_utc": "2026-09-30",
+  "decision": "Retain terminal target-prefill tail merging with original attention and MTP chunk boundaries. Earlier boundary-only and MTP-only candidates are rejected. Final 32K/133K HTTP turns are exact and faster; short controls are stable.",
+  "machine": "Framework Desktop, Ryzen AI Max+ 395 / Radeon 8060S gfx1151, 128 GB, Ubuntu 26.04",
+  "toolchain": {
+    "image": "gufo-dev:rocm10",
+    "gcc": "16.2.1-2.fc44",
+    "rocm_package": "amdrocm-core-devel10.0-gfx1151-10.0.0-4",
+    "hip": "7.15.26333-0000000",
+    "amd_clang": "23.0.0git"
+  },
+  "model_identities": "model-identities.json",
+  "binary_sha256": {
+    "baseline": "f41566f4c3abec52a0b01d74e0a732d4e97c35a79d12dcd58f3b46cd376cfcaf",
+    "boundary_only_candidate": "d3e8c4d41d4d0452fd441a30f84e5f9fb3a61ca82277231f9e51ec67d2058683",
+    "mtp_preserving_candidate": "bc8907084fc4c68dd87c5f6925dd64f2edee3f827995fd6af174b7b3e8d79b42",
+    "formatted_mtp_only_candidate": "a8c09e7a3992586fe3332dd743ed39ad72a52ebd21ef2fd5f780478b27b8190b",
+    "attention_and_mtp_preserving_candidate": "0c52a5389e1b9d2f832178ab3e1aa404fa5d7ef04190db60a2092cda0a47225a"
+  },
+  "mtp_only_formatting_equivalence": "Formatting changes debug metadata, but all 27 loadable non-NOBITS ELF sections, including host code and the complete HIP fat binary, match the earlier MTP-preserving production build byte-for-byte.",
+  "diagnosis": {
+    "fixture_tokens": 4096,
+    "compared_chunk_limits": [2048, 2176],
+    "first_differing_layer_zero_based": 3,
+    "first_differing_operator": "WMMA causal attention context, before the output projection",
+    "unchanged": "All traced outputs in layers 0-2, layer 3's HC mixer, queries, gates, FP16 keys and values",
+    "differing_context_rows_before_fix": 1920,
+    "mechanism": "A batch crossing the 2048-token selection budget routes earlier queries through packed-head sparse attention, which lacks the dense path's exact causal-tail accumulation. The initial fix restores dense-prefix arithmetic; the final fix below preserves each original subchunk's dispatch and padding.",
+    "traced_row_hashes_after_fix": 102400,
+    "differing_traced_row_hashes_after_fix": 0,
+    "full_vocabulary_logits_match_original_2048_build": true
+  },
+  "captured_operator_replay": {
+    "scope": "First 32 layer-3 query rows from the failing model fixture; identical captured query/gate/key/value bytes in both chunk configurations. Standalone HIP replay with the existing independent FP64 formula.",
+    "original_sparse_differing_floats": 76849,
+    "original_sparse_maximum_difference": 1.78814e-7,
+    "corrected_differing_floats": 0,
+    "dense_and_corrected_fp64_maximum_error": 0.000231935,
+    "original_sparse_fp64_maximum_error": 0.000231965,
+    "unchanged_wmma_absolute_error_limit": 0.02
+  },
+  "quality": {
+    "attention_operator": "Eight dense/boundary/ragged cases match exactly, including 1/3/8/128-row sparse suffixes, nonzero unaligned starts, final-only outputs and untouched prefixes. Existing preparation, graph-position, structured sparse FP64 and WMMA gates pass.",
+    "final_attention_operator": "Eleven bulk-versus-split cases are bit-identical, including 1/3/9/11/33/128-row tails, unaligned 2K/32K/64K/133K starts, final-only output and untouched-prefix checks. Existing independent FP64, preparation and graph-position gates pass without tolerance changes.",
+    "prefill": "The existing --prefill-only suite passes, including the formerly failing 4096/2048 boundary and four complete logit rows per case.",
+    "depth_32768": "At capacity 196608, the complete 248320-entry final vocabulary vector is byte-identical between 2048- and 2176-token chunking; SHA256 ad258f39587ff25168f464287513335a71b8a9492aa9c7c6f27d9c193b221f84.",
+    "final_prefill": "Twelve boundary cases through 4096 tokens pass four complete logit rows each, including 1/3/11/128-token suffixes above 2048. Those four tails also pass 32-token sampled continuation with exact full logits and RNG at each frontier. Complete serialized state is byte-identical for 2059/2048, 2176/2048 and 4096/2048.",
+    "final_batch": "C2/C4/C6/C8 AR/MTP logits, tokens and RNG exact; cancellation, rollback, independent state, sampled residuals and peer snapshots during graph capture pass.",
+    "final_sampling": "All 23 sampling configurations pass AR/MTP, C2 and request-budget replay.",
+    "final_lookup": "At 224/32768 tokens, greedy full logits/tokens/RNG, restored state and sampled replay are exact; 41/45 and 48/48 copied proposals accepted.",
+    "final_snapshot": "At 32769 tokens, 1019240660 serialized bytes; persistent/fresh/used-session, sampled and deferred-residual round trips are exact. Snapshot SHA256 e95890ff30e355a9635d8b9a23305bce955035cb88640b549c0fe973ac2a8f9c.",
+    "scope": "Regression consistency for these quantized weights, not unquantized-model equivalence. No vision sidecar is installed. No tolerance was relaxed."
+  },
+  "allocation_probe": {
+    "scope": "Isolated hipMemGetInfo delta around Executor::Create, after loading target weights, before creating an AR session; one logit row in both arms. This includes executor/library reservations and is not total production process memory.",
+    "max_batch_2048_bytes": 1649401856,
+    "max_batch_2176_bytes": 1761865728,
+    "increase_bytes": 112463872
+  },
+  "http_32768": {
+    "context_capacity": 196608,
+    "thinking": true,
+    "seed": 73,
+    "cached_tokens": 32920,
+    "appended_tokens": 2059,
+    "output_budget": 128,
+    "baseline_replay": "All six measured branches match the preceding qualified baseline.",
+    "candidate_replay": "The cold prefix and all three measured greedy branches match. The first measured sampled branch differs; qualification stops before its remaining samples or 133K expansion.",
+    "sampled_request": {"temperature": 1, "top_p": 0.95, "top_k": 20},
+    "failed_sample": {
+      "mode": "sampled",
+      "repetition": 1,
+      "baseline_message_sha256": "f989a9bc65123cc9a82083e667c7bd7b574b560e32c79829d49339620ad32d42",
+      "candidate_message_sha256": "87e94bd464273a3fa105280425a750d3cab6b885d6039ef4876a5f19b16c0711",
+      "both_prompt_tokens": 34979,
+      "both_completion_tokens": 128,
+      "baseline_draft_tokens_and_accepted": [133, 88],
+      "candidate_draft_tokens_and_accepted": [127, 93]
+    }
+  },
+  "mtp_preserving_followup": {
+    "diagnosis": "Reconstructing the actual 34979-token HTTP prompt from a common 32920-token checkpoint gives identical target prefill logits. The initial candidate's sampled tokens and RNG diverge at the frontier after five generated tokens.",
+    "mechanism": "Keep ordinary target chunks at 2048 and merge only a terminal suffix of at most 128 tokens. Within a merged target forward, retain MTP's original 2047-row catch-up, single boundary row and remaining tail; later target residual rows survive earlier predictor writes in existing scratch.",
+    "actual_prompt_replay": "All 128 sampled tokens, RNG states and full-vocabulary target logits match at every committed frontier after preserving MTP shapes.",
+    "prefill": "Existing boundary gates plus 2059/2048 and 2176/2048 pass four full-logit rows per case.",
+    "first_http_order": "candidate, baseline",
+    "http_replay": "Cold prefix, warmups, all three greedy branches and all three sampled branches match the qualified baseline, including prompt/output/cache counts and draft acceptance counts.",
+    "first_pair_medians": {
+      "greedy": {
+        "baseline_http_wall_ms": 3696.7252229806036,
+        "candidate_http_wall_ms": 3670.376469002804,
+        "wall_reduction_percent": 0.7127593312590164,
+        "baseline_prefill_ms": 1489.8808419999998,
+        "candidate_prefill_ms": 1436.748482
+      },
+      "sampled": {
+        "baseline_http_wall_ms": 4612.05099200015,
+        "candidate_http_wall_ms": 4792.700955003966,
+        "wall_reduction_percent": -3.9169116585476393,
+        "baseline_prefill_ms": 1479.6533519999998,
+        "candidate_prefill_ms": 1487.6372
+      }
+    },
+    "timing_concern": "Candidate sampled branch 2 has 1571.9 ms prefill and 3144.0 ms decode, versus 1487.8/3042.1 ms in the baseline. The candidate's post-request available host memory is about 1.7 GiB lower than its preceding branch. No compactions are recorded. The opposite order below improves both modes; a consistent 32K sampled whole-turn gain is not established.",
+    "confirmation_http_order": "baseline, candidate",
+    "confirmation_pair_medians": {
+      "greedy": {
+        "baseline_http_wall_ms": 3699.7168360103387,
+        "candidate_http_wall_ms": 3638.105894991895,
+        "wall_reduction_percent": 1.665288013903321,
+        "baseline_prefill_ms": 1487.60557,
+        "candidate_prefill_ms": 1428.797837
+      },
+      "sampled": {
+        "baseline_http_wall_ms": 4688.681521016406,
+        "candidate_http_wall_ms": 4559.84077200992,
+        "wall_reduction_percent": 2.7479100132728917,
+        "baseline_prefill_ms": 1531.990362,
+        "candidate_prefill_ms": 1425.506089
+      }
+    },
+    "all_32k_measured_responses_exact": 24
+  },
+  "deep_sparse_tail": {
+    "mtp_only_http_result": "Cold prefix and three greedy outputs match at 133295 cached tokens, but sampled branch 1 differs. The later short controls and OpenCode checks were not run for this failed candidate.",
+    "fresh_baseline": "The saved qualified production binary repeats the retained cold prefix and sampled branch hashes exactly.",
+    "operator_reproduction": {
+      "start_position": 133295,
+      "tokens": 2059,
+      "split": 2048,
+      "differing_floats": 306,
+      "first_differing_row": 2047,
+      "maximum_absolute_difference": 7.45058e-9
+    },
+    "mechanism": "Sparse WMMA's zero probabilities multiplying populated future V lanes do not always round like zero-padded chunk boundaries. Merged projections now keep the original 2048-query attention launches, including each launch's KV load bound and dense/sparse choice. Existing launches of at most 2048 queries keep their dispatch.",
+    "corrected_actual_prompt": {
+      "cold_prompt_tokens": 133167,
+      "cached_tokens": 133295,
+      "full_prompt_tokens": 135354,
+      "full_vocabulary_logits_exact": true,
+      "serialized_snapshot_bytes": 3836230584,
+      "differing_snapshot_bytes": 0,
+      "sampled_tokens": 128,
+      "every_committed_frontier_tokens_rng_full_logits_exact": true
+    }
+  },
+  "retained_http": {
+    "order": "baseline, candidate",
+    "scope": "Production binaries, same toolchain/weights, C1, capacity 196608, seed 73. Thinking-enabled long turns append 2059 tokens, with one warmup and three measured branches per mode. Full HTTP time includes snapshots and decoding; model loading is excluded.",
+    "greedy_32k": {"baseline_wall_ms": 3717.644983989885, "candidate_wall_ms": 3649.043959012488, "wall_reduction_percent": 1.8452817650106201, "baseline_prefill_ms": 1501.9262429999999, "candidate_prefill_ms": 1438.136113},
+    "sampled_32k": {"baseline_wall_ms": 4650.9312549897, "candidate_wall_ms": 4585.485010000411, "wall_reduction_percent": 1.4071643161587377, "baseline_prefill_ms": 1501.2566510000001, "candidate_prefill_ms": 1446.15708},
+    "greedy_133k": {"baseline_wall_ms": 3848.606343002757, "candidate_wall_ms": 3727.1764609904494, "wall_reduction_percent": 3.1551650439147205, "baseline_prefill_ms": 1645.875479, "candidate_prefill_ms": 1549.885687},
+    "sampled_133k": {"baseline_wall_ms": 4250.642952014459, "candidate_wall_ms": 4133.432668983005, "wall_reduction_percent": 2.757471854367499, "baseline_prefill_ms": 1628.130261, "candidate_prefill_ms": 1550.31161},
+    "long_replay": "All 24 measured responses across both arms match the retained baseline's messages, finish reasons and prompt/output/cache counts. Sampled draft and acceptance counts also match. Warmups and cold-prefix messages match. All twelve matched measured branches are faster.",
+    "output_lengths": "128 tokens except the same 67-token deep sampled branch on both arms.",
+    "short_controls": {
+      "prose": {"baseline_decode_tps": 37.21088340952719, "candidate_decode_tps": 37.16950815311856, "baseline_wall_ms": 4784.958456992172, "candidate_wall_ms": 4785.706948983716},
+      "sampled_code": {"baseline_decode_tps": 67.18893737001733, "candidate_decode_tps": 67.08196404850935, "baseline_wall_ms": 2855.2255999820773, "candidate_wall_ms": 2856.049573980272}
+    },
+    "short_and_opencode_replay": "All twelve short responses and eight OpenCode HTTP contract cases match. Long history reuses all 134063 prompt tokens on replay; streamed reasoning/tool arguments, tool-result continuation and strict JSON pass.",
+    "total_measured_http_and_contract_responses_exact": 44,
+    "noise": "The first deep greedy baseline branch is slower; the median excludes it. All matched branches improve, and snapshot capture is not faster in the deep candidate. This table uses one baseline-first pair; earlier 32K MTP-only experiments are recorded separately and are not retained speed claims."
+  },
+  "deployment": {
+    "binary": "build/release/gufo",
+    "binary_sha256": "0c52a5389e1b9d2f832178ab3e1aa404fa5d7ef04190db60a2092cda0a47225a",
+    "normal_compose_mount_verified": true,
+    "context_capacity": 196608,
+    "readiness_and_ready_completion_verified": true,
+    "opencode_input_output_limits": [163840, 32768],
+    "executable_task_evidence": "framework-task-review.json"
+  },
+  "retained_source_sha256": {
+    "src/cli/serve/inference_backend.cpp": "bcc797bd4d1ff4a9b4462f4657566f42acc462a3394f71082aede057c1f91b18",
+    "src/models/qwen38_flash_next/config.hpp": "f0094f29ae059324184ad437204a327e4e3191cc841c178f749c5e442e24b8e3",
+    "src/models/qwen38_flash_next/engine.cpp": "3877375e1e47e99242b17206162b3ffd0c164d835a9cb32c265d8729a908b3e0",
+    "src/models/qwen38_flash_next/engine.hpp": "01bd2c40e4ba0996093a2221575fd0008be69c35c3c66d59a00ae1ef14675b90",
+    "src/models/qwen38_flash_next/kernels/rocm/executor.cpp": "daf0e827f3a644d098a66afd2d8d567c7df516fb36adcf2423e6089bb21e1830",
+    "src/models/qwen38_flash_next/kernels/rocm/kernels.hip.cpp": "ba3c3fc40978308d53f9c9381fe5c83a8b811781cc3e7a67896ae9a08a84d2c8",
+    "src/models/qwen38_flash_next/kernels/rocm/kernels.hpp": "6e2a968d48090daea2133f55b3be5036e42c889752f714f73a8504ea2247b3dd",
+    "tests/models/qwen38_flash_next/attention_ops_test.cpp": "fef1adca9dc19632ce54b67d6f9afaf8e87fc82a5fb34dca88a174d9af5cfe7e",
+    "tests/models/qwen38_flash_next/session_test.cpp": "66d165919d93bff94a2fd823ea135dcf0a1c2a9cc336e5c1db1862ddf67d5820"
+  },
+  "raw_artifacts_sha256": {
+    "artifacts/framework/boundary-diagnostic.patch": "d8dc6d48b50e0c68b3d22ca456f4c47a79b9ed38233bdb446b22f947207a61ef",
+    "artifacts/framework/boundary-deep-diagnostic.patch": "6872905861f5c02d9760114534239b55ccc45f8c90d1ce9ff6cc450a3bd1b2a8",
+    "artifacts/framework/boundary-attention-before.log": "82baa80d9b9d8aa2c1738f39912a4e83362b21f1cbad18588aa9aaed3bb683e3",
+    "artifacts/framework/boundary-capture-2048.csv": "2029d4dcbd445279e67fb5e43fa5eaf81c62ebe7d1f6c15482576e294ec15da3",
+    "artifacts/framework/boundary-capture-2176.csv": "e4d7e937a59e10354643522be538b3ae7a14ba6b034ebf988af7289b6e98d9f7",
+    "artifacts/framework/boundary-fixed-2048.csv": "2029d4dcbd445279e67fb5e43fa5eaf81c62ebe7d1f6c15482576e294ec15da3",
+    "artifacts/framework/boundary-fixed-2176.csv": "c3c081d54d19dc4458e35e554dfef2cf459ed215209aedb76ce94593a9e99aec",
+    "artifacts/framework/boundary-fixed-logits-2048.bin": "959b2a7fb87bd0c4ceb7f01e49f4727895ee5d662878e6f30edc3e0eb210c47b",
+    "artifacts/framework/boundary-fixed-logits-2176.bin": "959b2a7fb87bd0c4ceb7f01e49f4727895ee5d662878e6f30edc3e0eb210c47b",
+    "artifacts/framework/boundary-prefill-after.log": "b22df67f356eb2ac69adc6c4e581baca13ff565b719fc3591dd3cab67144f19d",
+    "artifacts/framework/boundary-attention-ragged.log": "239634c55213b98d00840c1db48ca4823cb1a2701d7e55fb32e37032253ceaf3",
+    "artifacts/framework/boundary_replay.hip": "4b1d9284a647b6e220db19e1fc3db9200ff74bb30e5503089b209a6211771e71",
+    "artifacts/framework/boundary-replay.log": "8cd3206d692bf87379b2c23a27089f14dba0c686524eeb7a68344f83d322f604",
+    "artifacts/framework/boundary-32k-logits-2048.bin": "ad258f39587ff25168f464287513335a71b8a9492aa9c7c6f27d9c193b221f84",
+    "artifacts/framework/boundary-32k-logits-2176.bin": "ad258f39587ff25168f464287513335a71b8a9492aa9c7c6f27d9c193b221f84",
+    "artifacts/framework/boundary-32k-probe-2048.log": "ca30eea7683423c03406cd31563b837c489a7f45076ae682a4fb88fc80ef00a1",
+    "artifacts/framework/boundary-32k-probe-2176.log": "34651fde23ec76400cdbaa339f730b06823ed56a3bf2d21ac985bab7937a34bb",
+    "artifacts/framework/boundary-production-build.log": "1635c35f66a84dc6cf536eb06a74945433b72f319cd497702963bd49f58a4f1f",
+    "artifacts/framework/boundary-http-32k.log": "60d87a298b52837ea7809d9184764a01730dc8108934d6016d7d2d3f84bf12f1",
+    "artifacts/framework/boundary-baseline-thinking-32k.json": "30005f0db903d3d5e3e5ad779fa45aa98a4922abd649d84f34c7046df5e6961e",
+    "artifacts/framework/boundary-candidate-thinking-32k.json": "d7f5cfa0451f9c477954c450f01e61a409b4dd69e78bbf4ea9c7fe72dd4f1a6a",
+    "artifacts/framework/boundary_branch_probe.cpp": "62f726672000aa1897cae44518cb831862a92470c7c35d4430ee2e8c18c12b87",
+    "artifacts/framework/boundary-sampled-messages.json": "ff6f682996a99cc36f02fe18bad77219a589ba224ca791d79dbebf3d1e09877e",
+    "artifacts/framework/boundary-branch-before.log": "54a40782e99b2b01e7189cfc8da97d74693119033457858c51aae647be2d113a",
+    "artifacts/framework/boundary-branch-mtp-split.log": "cc7d5cec82135bda19d3531589e3451de9fe2e9ab0b33b51affcc463418b411b",
+    "artifacts/framework/boundary-prefill-mtp-split.log": "2d6fd32b5c2d3c0976f7b998a6c69687a6b8f54b3355baf58b5a9fa3d0da2d40",
+    "artifacts/framework/boundary-attention-deep-before.log": "ac4c0d50fa5295fa98859a656da15543a97198ac45b5c5ae3e8eddd346f1292d",
+    "artifacts/framework/boundary-mtp-split-production-build.log": "bb420bd2cce3acba04bbd311897288e69ddf5e6ced7b214d10d1cc1be221b2a3",
+    "artifacts/framework/boundary-mtp-split-candidate-thinking-32k.json": "41ed680063d5b5587d33a9a491c8e6f4987932f2b937750d414c18cfaf17c77b",
+    "artifacts/framework/boundary-mtp-split-baseline-thinking-32k.json": "39ab0d2bd30f831c73cbc34786c93eb4f5564c04d3e427e60781076e553a456f",
+    "artifacts/framework/boundary-mtp-http-32k.log": "aa081804798fdb70f8d499c3d553d6c7e62a104a2b45de5187e0377ca5911659",
+    "artifacts/framework/boundary-final-candidate-thinking-133k.json": "36b42d3a6f243a8e8784630e4569252b0afd5838541eed8bd1cc0f7f5f4950df",
+    "artifacts/framework/boundary-final-http-deep.log": "aeb2236141b54aebfc8c8ff26e859b8bbcb9ec1f70436498439041fe5f96bb97",
+    "artifacts/framework/boundary-133k-attention.log": "ba8823e62b01ab903ec6baf40d54d04c82289085675d484560c800909b202442",
+    "artifacts/framework/boundary-deep-baseline-capture.log": "e1a573198599273097dda3276803a5b005c9b97081122b537208f522504983d1",
+    "artifacts/framework/boundary-deep-baseline-response.json": "48bd34c6be074cad95d7a8810f84177e9b40b7379ec68cdda42295b5cbb46e18",
+    "artifacts/framework/boundary_deep_branch_probe.cpp": "6847b9ad58d7074442ecbb0b5d6e843c00c6735e3ebbf31007a2de1b084bbed2",
+    "artifacts/framework/boundary-kv-split-deep-branch.log": "6d6b499b0bb999e806c1fd4696bd8adcc44c0a75598d580dd78a727ebe11252c",
+    "artifacts/framework/boundary-kv-split-attention.log": "02c82435d37f70aaecaac1c6b4fe516f3aea71da32dbf51b685494c695ea96f5",
+    "artifacts/framework/boundary-final-prefill.log": "36b757e9592c9f1d4e3ea68772348e07a9e85f2f01bdd36a0ab973bfffe63a28",
+    "artifacts/framework/boundary-final-batch.log": "568aa1905a8d2c09b30af3b46fe3b458a2680cad1ec17c4836d4329606777d2d",
+    "artifacts/framework/boundary-final-sampling.log": "5108c059aecbebf37874b5193e70b60c194ef83f843e79e6c197bd15b52673d0",
+    "artifacts/framework/boundary-final-lookup.log": "58233d084f3fea3e3347ffad7bbede532d193705a8140384708d7f3b1f8430b1",
+    "artifacts/framework/boundary-final-snapshot.log": "52941508ea27225fe80334fbb71cc06ec8daf3d7b6b4809fdfaa4761b3c0fed6",
+    "artifacts/framework/boundary-preserved-attention.log": "55545a7795e32f15f8dba44a0e64d55f0bc44b38c55e9f80b9fae3e7554f7f98",
+    "artifacts/framework/boundary-tail-replay.log": "369f27300b89b763ee121726aa3e63e68a09460466053115b6653fef310a4cf1",
+    "artifacts/framework/boundary-preserved-production-build.log": "d0d212f133886a7bace71a16e075cd50daceced020750af23437488ff502122f",
+    "artifacts/framework/boundary-http-summary.json": "700934f2716dd7e9ac21f483c90c77a6b3da16e7e7df9bb6452b9480bb3a2c97",
+    "artifacts/framework/boundary-kv-http.log": "8b6ab06eb152a6c237342b83bff9cb3e417d7e57a6b99b56838ba79cf896e0e7",
+    "artifacts/framework/boundary-deployment.json": "7d4451c287b05e0b216e57796a91e122243c30951938fa238c65f85b6109bcd6",
+    "artifacts/framework/boundary-deployment.log": "10070c0f4a7f1fda7bb37add23abdd54efc5669227c4bb6855b5677a38cb472e"
+  }
+}

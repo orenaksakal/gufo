@@ -406,11 +406,14 @@ void Attention(const float* q, const __half* k_cache, const __half* v_cache,
                hipStream_t stream);
 
 /// Fused causal attention on the WMMA cores for wide batches: scores, online
-/// softmax, PV and the sigmoid output gate in one launch. `mask` follows
+/// softmax, PV and the sigmoid output gate together. `mask` follows
 /// Attention's block-selection contract (null for the dense window). Returns
 /// false, launching nothing, when the geometry is not the model's 24 x 256
 /// heads over two KV heads. `last_only` computes only the final dense query
 /// tile, retaining its key sweep and leaving earlier output rows untouched.
+/// Merged prefill tails retain the original 2048-query launch boundaries and
+/// their zero-padded future KV lanes. A subchunk ending at/below `dense_until`
+/// must select every causal block and retains the original dense dispatch.
 bool WmmaCausalAttention(const float* q, const float* gate,
                          const __half* k_cache, const __half* v_cache,
                          const std::uint32_t* mask, std::uint32_t mask_words,
@@ -418,7 +421,7 @@ bool WmmaCausalAttention(const float* q, const float* gate,
                          std::uint32_t start_pos, std::uint32_t heads,
                          std::uint32_t kv_heads, std::uint32_t d,
                          std::uint32_t ratio, hipStream_t stream,
-                         bool last_only = false);
+                         bool last_only = false, std::uint32_t dense_until = 0);
 
 /// counts[e] = number of (token, slot) pairs routed to expert e.
 void ExpertCounts(const std::int32_t* ids, std::uint32_t* counts,

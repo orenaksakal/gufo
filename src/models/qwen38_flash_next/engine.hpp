@@ -74,6 +74,8 @@ public:
   [[nodiscard]] bool IsStopToken(std::int32_t token) const noexcept;
   [[nodiscard]] std::uint32_t VocabSize() const noexcept;
   [[nodiscard]] std::uint32_t PrefillCapacity() const noexcept;
+  [[nodiscard]] std::size_t PrefillChunkSize(
+      std::size_t remaining) const noexcept;
   [[nodiscard]] std::uint32_t MaxContext() const noexcept {
     return options_.max_context;
   }

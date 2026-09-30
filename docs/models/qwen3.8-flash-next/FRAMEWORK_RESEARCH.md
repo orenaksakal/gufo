@@ -47,9 +47,17 @@ its roughly 675 MB weight pass takes about 3 ms in the cold-ring diagnostic.
 The measured full-model gain is consequently much smaller than the best
 small-projection microbenchmark gain.
 
+The terminal-prefill iteration shares target projection work across a final
+2048 + ≤128-token span. It preserves both attention's original launch bounds
+and the predictor's original catch-up shapes. Zero-probability WMMA products
+against populated future values can change rounding at a chunk boundary;
+equal first target logits can also conceal a predictor-state difference that
+later changes sampled acceptance. Full serialized-state and seeded-frontier
+checks are therefore necessary alongside operator formulas and HTTP timing.
+
 ## Ideas requiring separate qualification
 
-- **Wider prefill chunks / GEMM plans:** Halogen's 8K arena cannot be copied as
+- **Larger prefill chunks / GEMM plans:** Halogen's 8K arena cannot be copied as
   a number into Gufo's different scratch layout. Profile Gufo's 2048-token
   projection/attention shapes first, including its ragged tails.
 - **Fewer bits, attention-budget reduction, composable context, reduced

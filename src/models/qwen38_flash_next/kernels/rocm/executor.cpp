@@ -1491,7 +1491,7 @@ bool Executor::Attention(const DeviceLayer& l, Session::AttentionState& s,
       WmmaCausalAttention(s_.q, s_.attn_gate, s.k_cache, s.v_cache, mask,
                           mask_words_, s_.ctx, n_tokens, start_pos, c.num_heads,
                           c.num_kv_heads, c.head_dim, c.compress_ratio, stream_,
-                          last_only)) {
+                          last_only, c.indexer_top_k)) {
     return !project_output ||
            Dense(l.attn_out, s_.ctx, out, n_tokens, error_msg);
   }
@@ -1909,8 +1909,20 @@ bool Executor::Forward(Session& session, std::span<const std::int32_t> tokens,
     // the trunk residual is still in shared scratch. MtpBody reads that
     // residual into xn before reusing res for the predictor output.
     PrefillPhase draft_phase(false);
-    if (!MtpForward(session, tokens.subspan(1), 0, {}, error_msg, s_.res))
-      return false;
+    // A merged target tail must retain the predictor's original wide chunk,
+    // single boundary row and tail shapes. Each call overwrites only the
+    // beginning of res; the later target rows remain live until consumed.
+    for (std::uint32_t off = 0; off < n - 1;) {
+      const auto within = off % kPrefillChunkTokens;
+      const auto count =
+          std::min(n - 1 - off, within == kPrefillChunkTokens - 1
+                                    ? 1U
+                                    : kPrefillChunkTokens - 1 - within);
+      if (!MtpForward(session, tokens.subspan(off + 1, count), 0, {}, error_msg,
+                      s_.res + static_cast<std::size_t>(off) * c.HcDim()))
+        return false;
+      off += count;
+    }
   }
   return true;
 }

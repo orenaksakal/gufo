@@ -557,27 +557,46 @@ void CheckStructured(const char* name, std::uint32_t n_tokens,
   }
 }
 
-void CheckChunks(std::uint32_t n, std::uint32_t split) {
+void CheckChunks(std::uint32_t n, std::uint32_t split,
+                 bool selection_boundary = false, std::uint32_t position = 0) {
+  const auto end = position + n;
   const std::size_t count = std::size_t(n) * kQWidth;
   HipBuffer<float> queries(count), gates(count), full(count), chunked(count);
-  HipBuffer<__half> keys(std::size_t(n) * kKvWidth),
-      values(std::size_t(n) * kKvWidth);
+  HipBuffer<__half> keys(std::size_t(end) * kKvWidth),
+      values(std::size_t(end) * kKvWidth);
+  const std::uint32_t words = ((end + kRatio - 1) / kRatio + 31) / 32;
+  HipBuffer<std::uint32_t> masks(std::size_t(n) * words);
+  if (selection_boundary) {
+    std::vector<std::uint32_t> mask(std::size_t(n) * words);
+    for (std::uint32_t t = 0; t < n; ++t) {
+      const auto complete = (position + t + 1) / kRatio;
+      // All causal blocks before the budget, then the most recent 512.
+      for (auto b = complete - std::min(512U, complete); b < complete; ++b)
+        mask[std::size_t(t) * words + b / 32] |= 1U << (b % 32);
+    }
+    Upload(&masks, mask);
+  }
   Upload(&queries, MakeValues(count, 412, 4.0F));
   Upload(&gates, MakeValues(count, 721, 3.0F));
   for (auto* destination : {&keys, &values}) {
-    const auto f = MakeValues(std::size_t(n) * kKvWidth,
+    const auto f = MakeValues(std::size_t(end) * kKvWidth,
                               destination == &keys ? 891 : 347, 1.0F);
     std::vector<__half> half(f.size());
     std::transform(f.begin(), f.end(), half.begin(),
                    [](float x) { return __float2half(x); });
     Upload(destination, half);
   }
-  const auto run = [&](std::uint32_t start, std::uint32_t rows, float* out) {
+  const auto run = [&](std::uint32_t start, std::uint32_t rows, float* out,
+                       bool last_only = false) {
     const auto offset = std::size_t(start) * kQWidth;
+    const auto* mask = selection_boundary && position + start + rows > 2048
+                           ? masks.get() + std::size_t(start) * words
+                           : nullptr;
     if (!q::WmmaCausalAttention(queries.get() + offset, gates.get() + offset,
-                                keys.get(), values.get(), nullptr, 0,
-                                out + offset, rows, start, kHeads, kKvHeads,
-                                kDim, kRatio, nullptr)) {
+                                keys.get(), values.get(), mask, words,
+                                out + offset, rows, position + start, kHeads,
+                                kKvHeads, kDim, kRatio, nullptr, last_only,
+                                selection_boundary ? 2048U : 0U)) {
       throw std::runtime_error("chunk attention rejected geometry");
     }
   };
@@ -589,17 +608,30 @@ void CheckChunks(std::uint32_t n, std::uint32_t split) {
   std::size_t differences = 0, first = count;
   float max_error = 0;
   for (std::size_t i = 0; i < count; ++i) {
-    if (a[i] != b[i]) {
+    if (!std::isfinite(a[i]) || !std::isfinite(b[i]))
+      throw std::runtime_error("nonfinite chunk attention output");
+    if (std::memcmp(&a[i], &b[i], sizeof(float)) != 0) {
       ++differences;
       first = std::min(first, i);
       max_error = std::max(max_error, std::abs(a[i] - b[i]));
     }
   }
   std::cout << "chunk attention n=" << n << " split=" << split
-            << " differing=" << differences << " max=" << max_error
-            << " first_row=" << first / kQWidth << '\n';
+            << " start=" << position << " differing=" << differences
+            << " max=" << max_error << " first_row=" << first / kQWidth << '\n';
   if (differences != 0)
     throw std::runtime_error("attention depends on prefill chunk boundary");
+  constexpr float kUntouched = -123.875F;
+  Upload(&chunked, std::vector<float>(count, kUntouched));
+  run(0, n, chunked.get(), true);
+  const auto tail = Download(&chunked, count);
+  if (std::memcmp(tail.data() + count - kQWidth, a.data() + count - kQWidth,
+                  kQWidth * sizeof(float)) != 0)
+    throw std::runtime_error("final-only attention changed the last query");
+  for (std::size_t i = 0; n > 16 && i < (n - 16) * std::size_t{kQWidth}; ++i) {
+    if (tail[i] != kUntouched)
+      throw std::runtime_error("final-only attention overwrote its prefix");
+  }
 }
 
 }  // namespace
@@ -608,6 +640,15 @@ int main() {
   try {
     CheckChunks(136, 94);
     CheckChunks(2048, 1025);
+    CheckChunks(2049, 2048, true);
+    CheckChunks(2051, 2048, true);
+    CheckChunks(2176, 2048, true);
+    CheckChunks(2081, 2048, true, 2031);
+    CheckChunks(2059, 2048, true, 2040);
+    CheckChunks(2057, 2048, true, 2047);
+    CheckChunks(2059, 2048, true, 32920);
+    CheckChunks(2051, 2048, true, 65533);
+    CheckChunks(2059, 2048, true, 133295);
     CheckPreparation(1, 0, 64);
     CheckPreparation(8, 4096, 64);
     CheckPreparation(65, 131069, 64);

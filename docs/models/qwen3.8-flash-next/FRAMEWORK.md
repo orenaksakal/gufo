@@ -20,6 +20,11 @@ gain over the snapshot fork. Sampled gains are smaller; the 133K sampled turn
 is effectively stable. All compared outputs remain exact.
 [Reduction measurements](BENCHMARKS.md#framework-fork-exact-vector-reductions).
 
+Exact terminal-tail merging reduces complete-turn time **1.4–1.8% at 32K** and
+**2.8–3.2% at 133K** over the reduction fork. Attention padding and
+predictor chunk shapes remain exact; all 44 measured HTTP/contract responses
+match. [Tail-merging measurements](BENCHMARKS.md#exact-prefill-tail-merging).
+
 ## Build on this machine
 
 ```sh
@@ -162,16 +167,17 @@ It does not establish equivalence to the unquantized original model; upstream's
    addition tree and lowers decode cost modestly. The largest Q8 head remains
    bandwidth-bound; further gains require better projection reuse. Preserve
    FP64 probabilities and seeded replay when investigating sampled execution.
-3. **Deep prefill: profiled; candidates rejected.** The refreshed 32K HTTP
-   profile is 99.2% GPU-busy within its target pp2048 chunk. Dense tile grouping
-   offers no qualified win. A 2176-token chunk could absorb its expensive
-   11-token tail, but fails the existing full-logit boundary check. Isolate the
-   first divergent operator before revisiting tail merging; qualify at 32K,
-   measure scratch memory, then expand a winning pp2048/tg128 run to 133K+.
-   [Results and failure evidence](artifacts/framework-prefill-review.json).
-4. **Coding-task evidence.** Add bounded, executable repository-edit tasks with
-   test-based success criteria, tool-call counts and total completion time.
-   Keep synthetic replay fixtures for precise regression diagnosis.
+3. **Deep prefill: tail merging qualified.** The refreshed 32K HTTP
+    profile is 99.2% GPU-busy within its target pp2048 chunk. Dense tile grouping
+    offers no qualified win. Merging up to 128 terminal tokens now preserves
+    attention's original dense/sparse dispatch and KV bounds, plus predictor
+    catch-up shapes. Complete 32K/133K turns improve with exact state/replay;
+    the isolated executor probe adds approximately 107 MiB of allocation.
+    [Diagnosis and measurements](artifacts/framework-boundary-review.json).
+4. **Coding-task evidence: initial executable checks pass.** Normalization and
+    LRU edits pass external contract tests on both runtimes, with four tool calls
+    per task. Extend representative repository tasks while keeping synthetic
+    replay fixtures for precise numerical regression diagnosis.
 
 Every retained change uses matched production builds on this toolchain and
 the 196,608-token deployment capacity. The OpenCode input/output reserves and
@@ -262,3 +268,45 @@ checks original-versus-candidate bytes while rotating weights beyond MALL:
 tools/bench/build.sh tools/qwen-flash/q8_reduce_bench.hip
 /tmp/q8_reduce_bench
 ```
+
+### Tail-merging qualification
+
+The retained implementation keeps ordinary prefill at 2048 tokens, allowing only a
+terminal suffix of at most 128 tokens to share the target projections. Attention
+keeps the original 2048-query launch boundaries, dense/sparse choice and padded
+KV bounds; predictor catch-up retains its original wide/boundary/tail shapes.
+These details matter to seeded replay even when the first target logits match.
+
+Use the existing turn driver with `--depth 32768 --think on`, then
+`--depth 133120 --think on`, under identical saved production binaries. Compare
+complete requests and preserve response, token/cache counts and reasoning
+hashes with `--compare`. The session test's `--prefill-only` cases now cover
+1/3/11/128-token merged tails, complete snapshots where their hidden-row counts
+match, and seeded speculative continuation. The attention operator test includes
+unaligned starts at 2K, 32K, 64K and 133K.
+
+[Diagnosis and measurements](artifacts/framework-boundary-review.json).
+
+### Executable OpenCode tasks
+
+The task driver exercises the actual V2 CLI in fresh miniature repositories:
+configuration normalization and LRU behavior. Each starts with failing tests;
+the external grader uses the original tests against the resulting source file.
+It records success, tool calls/errors, model steps, source/test/event hashes and
+wall time including client startup and tools, excluding external grading.
+The fixtures use greedy, thinking-off requests, seed 73, a 2048-token response
+cap, ten model steps and a 240-second task deadline. They are bounded task
+checks, not a general coding-quality score or a long-context workload.
+
+```sh
+python3 tools/qwen-flash/framework-task-bench.py --label candidate \
+  --output artifacts/framework/tasks-candidate.json
+```
+
+Run against an exclusive server. The driver uses a private OpenCode server,
+configuration and database under `/tmp/opencode`; each task may edit only its
+`solution.py` and run its local `unittest` command. `--prepare-only` validates
+the intentionally failing fixtures without model requests. Raw JSONL events,
+stderr logs and temporary repositories are retained for inspection.
+The driver resets the logical `PWD` and inherited OpenCode settings so nested
+invocations use the fixture's Location. [Current results](artifacts/framework-task-review.json).

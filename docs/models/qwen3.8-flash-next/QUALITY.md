@@ -134,17 +134,65 @@ The local vision-sidecar limitation above still applies.
 
 ## Framework deep-prefill follow-up
 
-The proposed 2176-token chunk limit is **rejected**: the assertion-enabled
+The initial uniform 2176-token chunk limit was **rejected**: the assertion-enabled
 `qwen38_flash_next_session_test --prefill-only` reports changed full logits
 for a 4096-token prompt split at 2048, before decoding step zero. The preceding
-136-token boundary cases and 2048/1025 split pass. The first divergent operator
-is not yet isolated. The candidate was reverted before HTTP timing or deeper
-qualification; the deployed chunk limit remains 2048.
+136-token boundary cases and 2048/1025 split pass. That candidate was reverted
+before HTTP timing or deeper qualification. The corrected implementation below
+keeps ordinary chunks at 2048 and merges only a terminal tail of at most 128.
 
 All six newly measured baseline 32K-turn messages and token/cache counts match
 the prior retained build. The instrumented cold-prefix and branch responses
 also match. These are regression observations, not a quality pass for the
 rejected candidate. [Evidence](artifacts/framework-prefill-review.json).
+
+The follow-up isolates the first difference in **layer 3 WMMA attention**:
+queries below the selection budget take the sparse kernel when their batch
+crosses 2048. Boundary-aware dispatch restores all 102,400 traced row hashes,
+the original 4096-token logits and a complete 32K vocabulary vector. A replay
+of captured inputs also passes the unchanged independent FP64 gate.
+
+Uniformly increasing chunks still changes sampled HTTP replay. On the actual
+34,979-token prompt, target logits match but speculative decoding diverges
+after five output tokens. Preserving the original predictor chunk shapes while
+merging only the target tail restores all 128 tokens, full logits and RNG at
+every committed frontier, and all six 32K HTTP branches match. That MTP-only
+correction still failed sampled replay at 133K: sparse WMMA's zero probabilities
+against populated future values do not always round like zero-padded chunk
+boundaries. The standalone case at position 133,295 differed in 306 floats,
+starting at row 2047, despite a maximum error of only 7.45e-9.
+
+The retained fix keeps each original attention launch's KV bound and
+dense/sparse choice. Existing launches of at most 2048 queries retain their
+dispatch. Qualification on the same quantized weights and ROCm 10 toolchain:
+
+| Check | Result |
+| --- | --- |
+| Attention operators | Eleven bulk/split cases exact, including unaligned starts at 2K/32K/64K/133K; final-only and untouched-prefix checks pass; independent FP64 gates unchanged |
+| Prefill tails | Twelve boundary cases through 4096 tokens pass four full-logit rows each; 1/3/11/128-token tails pass 32 sampled tokens with exact logits/RNG at every frontier |
+| Full state | Snapshots exact for 2059/2048, 2176/2048 and 4096/2048 splits |
+| Actual 133K branch | All 3,836,230,584 snapshot bytes identical after 2059 appended tokens; 128 sampled tokens, RNG and full vocabulary logits exact at every committed frontier |
+| State/sampling controls | C2/C4/C6/C8, cancellation, rollback, peer capture, 32K restore/lookup and all 23 sampling configurations pass |
+| Production HTTP | 36 measured short/long responses and eight OpenCode contract responses match the qualified runtime; exact reuse of 134,063 prompt tokens, streamed reasoning/tools, tool-result continuation and constrained JSON |
+
+These are quantized-model regression checks, with the independent attention
+formula providing an operator oracle. The existing vision-sidecar limitation
+still applies. [Follow-up evidence](artifacts/framework-boundary-review.json).
+
+## Executable OpenCode tasks
+
+The qualified baseline and tail-merging build each complete **2/2** bounded
+repository edits through OpenCode v2.0.20: configuration normalization and LRU
+recency/eviction. Original fixtures fail the contract tests; independent
+known-correct implementations pass. An external grader runs the original tests
+against each generated source, including signed-integer and malformed-value
+cases, without accepting changes to the tests. Every task uses four tool calls
+and four model steps with no tool errors.
+
+These short greedy/thinking-off tasks provide executable edit evidence; the
+long-context gates above cover state/replay separately. Initial working-directory
+isolation failures and an expanded signed-input contract are recorded in the
+[task evidence](artifacts/framework-task-review.json).
 
 ## Benchmark method
 

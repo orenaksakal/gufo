@@ -12,6 +12,11 @@
 
 namespace gufo::models::qwen38_flash_next {
 
+// Keep ordinary prompt, attention and predictor chunks at the qualified width.
+// The target projections can absorb one extra tile at the end of a span.
+inline constexpr std::uint32_t kPrefillChunkTokens = 2048;
+inline constexpr std::uint32_t kPrefillTailTokens = 128;
+
 /// Architecture parameters of a `qwen4exp` GGUF artifact. Every value is read
 /// from the file; the fixed limits below only bound what this runtime was
 /// written and validated for (Qwen3.8-Flash-Next, 48 trunk layers).

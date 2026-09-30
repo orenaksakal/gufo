@@ -26,10 +26,6 @@
 namespace gufo::models::qwen38_flash_next {
 namespace {
 
-// gfx1151 pp4096 at depths 0/4096: the 512/1024/2048/4096 sweep favored
-// 2048; larger chunks used more scratch without improving throughput.
-constexpr std::uint32_t kPrefillChunkTokens = 2048;
-
 void AssignError(std::string* error_msg, std::string_view message) {
   if (error_msg != nullptr) {
     *error_msg = message;
@@ -201,7 +197,14 @@ std::uint32_t Model::VocabSize() const noexcept {
 }
 
 std::uint32_t Model::PrefillCapacity() const noexcept {
-  return std::min(kPrefillChunkTokens, options_.max_context);
+  return std::min(kPrefillChunkTokens + kPrefillTailTokens,
+                  options_.max_context);
+}
+
+std::size_t Model::PrefillChunkSize(std::size_t remaining) const noexcept {
+  return remaining <= PrefillCapacity()
+             ? remaining
+             : std::min(kPrefillChunkTokens, PrefillCapacity());
 }
 
 bool Model::HasMtp() const noexcept {
@@ -572,9 +575,8 @@ bool Session::DraftCatchUpBatch(std::span<const AdvanceRequest> requests,
 bool Session::Feed(std::span<const std::int32_t> tokens, std::string* error_msg,
                    bool prefill) {
   rocm::Executor& exec = *model_->executor_;
-  for (std::size_t off = 0; off < tokens.size(); off += exec.max_batch()) {
-    const std::size_t n =
-        std::min<std::size_t>(exec.max_batch(), tokens.size() - off);
+  for (std::size_t off = 0; off < tokens.size();) {
+    const auto n = model_->PrefillChunkSize(tokens.size() - off);
     const auto chunk = tokens.subspan(off, n);
     if (MtpEnabled() && !tokens_.empty() &&
         !DraftCatchUp(chunk[0], false, error_msg)) {
@@ -588,6 +590,7 @@ bool Session::Feed(std::span<const std::int32_t> tokens, std::string* error_msg,
     hidden_base_ = static_cast<std::uint32_t>(
         tokens_.size() + n - std::min<std::size_t>(n, exec.max_speculative()));
     tokens_.insert(tokens_.end(), chunk.begin(), chunk.end());
+    off += n;
   }
   return true;
 }
