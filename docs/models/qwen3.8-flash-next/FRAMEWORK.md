@@ -162,10 +162,13 @@ It does not establish equivalence to the unquantized original model; upstream's
    addition tree and lowers decode cost modestly. The largest Q8 head remains
    bandwidth-bound; further gains require better projection reuse. Preserve
    FP64 probabilities and seeded replay when investigating sampled execution.
-3. **Deep prefill: next.** Refresh the dense/routed projection profile on this
-   toolchain at 32K. Prioritize measured weight/activation reuse and tile costs,
-   then expand a winning pp2048/tg128 comparison to 133K+. The existing chunk
-   sweep favored 2048; wider chunks need fresh evidence and memory measurements.
+3. **Deep prefill: profiled; candidates rejected.** The refreshed 32K HTTP
+   profile is 99.2% GPU-busy within its target pp2048 chunk. Dense tile grouping
+   offers no qualified win. A 2176-token chunk could absorb its expensive
+   11-token tail, but fails the existing full-logit boundary check. Isolate the
+   first divergent operator before revisiting tail merging; qualify at 32K,
+   measure scratch memory, then expand a winning pp2048/tg128 run to 133K+.
+   [Results and failure evidence](artifacts/framework-prefill-review.json).
 4. **Coding-task evidence.** Add bounded, executable repository-edit tasks with
    test-based success criteria, tool-call counts and total completion time.
    Keep synthetic replay fixtures for precise regression diagnosis.

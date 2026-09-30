@@ -137,6 +137,14 @@ the mechanism; the table above uses unprofiled HTTP requests.
 [Reproduction](FRAMEWORK.md#vector-reduction-measurements) ·
 [Bounded measurements and qualification](artifacts/framework-dpp-review.json).
 
+### Deep-prefill follow-up
+
+The September 30 32K profile and two rejected prefill experiments are recorded
+in [the experiment log](EXPERIMENTS.md) and
+[bounded evidence](artifacts/framework-prefill-review.json). No new speedup is
+retained: the 2176-token candidate fails the existing full-logit boundary gate,
+and production remains the qualified 2048-token build at 196,608 capacity.
+
 ## Single user, autoregressive
 
 Approximately pp2048 / tg128; depth is the cached prefix in tokens.

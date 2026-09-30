@@ -62,6 +62,8 @@
 | Ordinary-page snapshots with parallel prefault | Rejected: faster snapshot capture, but the first matched 32K/133K HTTP turns were 0.8–2.6% slower overall. Transfer-only timings omitted allocation release and other request work; complete-request time remains the retention gate. Snapshot bytes and sampled restore remained exact. |
 | Parallel huge-page snapshot population (Framework fork) | Retained for buffers ≥256 MiB: four bounded CPU workers populate the existing allocation before HIP copies, with demand-paging fallback. 133K-prefix HTTP turns improve 3.5–3.6%, checkpoint capture 43–44%; 32K and short tg128 controls are stable. An 8 GiB idle-memory fixture improves whole turns 2.2–5.2%. All 18 measured branch completions and cache counts match. [Evidence](artifacts/framework-snapshot-review.json). |
 | Native-lane vector reductions (Framework fork) | Retained: permlanex16 plus DPP row-xmask/add preserves the descending 32-lane tree, including separate wave64 halves, without new allocation. Greedy copy/edit decode improves 0.6–1.0%; warmed mixed C8 improves 2.6%. Sampled gains are small; 133K sampled whole-turn time is effectively stable (−0.43% reduction, with checkpoint variation). Operators, full-logit/state checks and all 122 measured HTTP/contract responses pass exact replay. [Evidence](artifacts/framework-dpp-review.json). |
+| Dense prefill row-group locality (Framework fork) | Rejected: 2/4/8-row-tile grouping produced only small/inconsistent early gains. Completed SSM/QKV cases retained bytes, but the standalone sweep stopped at its FP64 gate on the unchanged output-projection control; no production dispatch changed. [Evidence](artifacts/framework-prefill-review.json). |
+| 2176-token prefill chunks (Framework fork) | Rejected: folding a short suffix could avoid the measured 106 ms target tail, but the existing full-logit check fails at 4096 tokens split at 2048, step zero. Smaller tested boundaries pass. No candidate HTTP speedup is claimed; the 2048-token build is restored. [Evidence](artifacts/framework-prefill-review.json). |
 
 The Framework copy-code profile isolates inference after loading (CLI, 1,068
 prompt tokens / 128 output tokens, one trace per binary). Kernel launches fall
@@ -85,6 +87,16 @@ projection reuse/GEMV work for the next iteration; it is not a measured speedup.
 Separate d32K pp2048 profiling attributes 29.1% of kernel time to MoE, 34.9%
 to dense projections and 12.6% to attention/indexing. Final-tile catch-up
 takes 20.9 ms of MTP kernel time; the target takes 1450.2 ms.
+
+The September 30 Framework HTTP refresh uses the current ROCm 10 toolchain,
+thinking-enabled coding/tool history and 196,608-token capacity. Its target
+pp2048 chunk at a 32,920-token cached prefix takes **1370.6 ms** of GPU time in
+a **1382.1 ms** span: routed projections 32.4%, dense F16 26.6%, dense int8
+6.1%, attention/indexing 10.9%, HC residuals 10.4% and GDN 8.3%. The following
+11-token target chunk takes another **106.0 ms** wall time. These exclude
+predictor catch-up, checkpoint capture and decoding. The chunk-size experiment
+above fails exactness; isolate its first divergent operator before retrying
+tail merging. [Scope and raw hashes](artifacts/framework-prefill-review.json).
 
 A d0 pp2048 profile (2026-09-21) is GPU-bound: 1362.8 ms of kernel time in a
 1380 ms span. Routed expert GEMMs take 35%, dense F16 projections 29%,

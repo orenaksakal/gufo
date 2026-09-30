@@ -132,6 +132,20 @@ The local vision-sidecar limitation above still applies.
 [Bounded evidence](artifacts/framework-dpp-review.json) ·
 [Reproduction](FRAMEWORK.md#vector-reduction-measurements).
 
+## Framework deep-prefill follow-up
+
+The proposed 2176-token chunk limit is **rejected**: the assertion-enabled
+`qwen38_flash_next_session_test --prefill-only` reports changed full logits
+for a 4096-token prompt split at 2048, before decoding step zero. The preceding
+136-token boundary cases and 2048/1025 split pass. The first divergent operator
+is not yet isolated. The candidate was reverted before HTTP timing or deeper
+qualification; the deployed chunk limit remains 2048.
+
+All six newly measured baseline 32K-turn messages and token/cache counts match
+the prior retained build. The instrumented cold-prefix and branch responses
+also match. These are regression observations, not a quality pass for the
+rejected candidate. [Evidence](artifacts/framework-prefill-review.json).
+
 ## Benchmark method
 
 Gufo single-user TG refreshed September 27, 2026 (`f797b5b`); PP and other

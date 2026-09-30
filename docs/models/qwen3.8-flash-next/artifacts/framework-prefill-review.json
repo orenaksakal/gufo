@@ -1,0 +1,136 @@
+{
+  "schema": "gufo.framework-prefill-review.v1",
+  "recorded_at_utc": "2026-09-30T05:03:18.408045+00:00",
+  "baseline_revision": "3469f4e974ce8c9bae3be6da033562350a077e9f",
+  "decision": "Both experiments rejected; the qualified 2048-token production build is restored.",
+  "machine": "Framework Desktop, Ryzen AI Max+ 395 / Radeon 8060S gfx1151, 128 GB, Ubuntu 26.04",
+  "toolchain": {
+    "image": "gufo-dev:rocm10",
+    "gcc": "16.2.1-2.fc44",
+    "rocm_package": "amdrocm-core-devel10.0-gfx1151-10.0.0-4",
+    "hip": "7.15.26333-0000000",
+    "amd_clang": "23.0.0git"
+  },
+  "model_identities": "model-identities.json",
+  "binary_sha256": {
+    "baseline_and_restored_deployment": "f41566f4c3abec52a0b01d74e0a732d4e97c35a79d12dcd58f3b46cd376cfcaf",
+    "rejected_2176_candidate": "ecf1f9ab26d228a924e988da99257317330a637742fc28bb338ac07c2695e745"
+  },
+  "engine_source_sha256": {
+    "baseline": "864ccce85673ad1c80a9d8edbb9ff95f9df67059b08ec95f99ca2b08b95d6d05",
+    "rejected_2176_candidate": "e73b0070e5fe1b01255b80f596025ce52e9c347e62ae18881a173fa149656823"
+  },
+  "settings": {
+    "context_capacity": 196608,
+    "sessions": 1,
+    "draft_ceiling": 7,
+    "seed": 73,
+    "thinking": true,
+    "output_budget": 128,
+    "archive_blocks": 436,
+    "cold_prompt_tokens": 32792,
+    "reused_tokens": 32920,
+    "appended_tokens": 2059,
+    "target_chunks": [2048, 11]
+  },
+  "unprofiled_baseline": {
+    "scope": "Existing framework-turn-bench.py fixture; one warmup and three distinct measured branches per mode. Complete HTTP wall time includes checkpoints and decoding. This is a baseline refresh, not a speedup comparison.",
+    "greedy": {
+      "median_prefill_ms": 1486.358387,
+      "median_http_wall_ms": 3695.9670019859914
+    },
+    "sampled": {
+      "temperature": 1,
+      "top_p": 0.95,
+      "top_k": 20,
+      "median_prefill_ms": 1499.9556910000001,
+      "median_http_wall_ms": 4637.146818015026
+    },
+    "replay": "All six measured messages, request hashes, finish reasons and prompt/output/cache counts match the prior retained DPP candidate; the cold-prefix message hash also matches."
+  },
+  "profile": {
+    "scope": "Separate instrumented HTTP server at capacity 196608: cold coding/tool history, then the greedy warmup branch. The target chunk runs from its EmbedKernel to the next predictor EmbedKernel. Loading, checkpoint capture, predictor catch-up and generation are excluded from the chunk totals.",
+    "driver": "tools/prof/prof.py, qwen-flash stage map",
+    "profiled_responses_match_unprofiled_baseline": true,
+    "target_pp2048": {
+      "dispatches": 1775,
+      "kernel_ms": 1370.601639,
+      "busy_ms": 1370.601639,
+      "wall_ms": 1382.113209,
+      "stages_ms": {
+        "moe_f16_projections": 444.688968,
+        "dense_f16_projections": 365.22249,
+        "dense_int8_projections": 83.492117,
+        "attention": 114.124843,
+        "attention_indexer_scores": 30.158474,
+        "attention_exact_selection": 4.60497,
+        "hyperconnection_residual": 142.575018,
+        "gdn": 113.899938
+      },
+      "largest_projection_components_ms": {
+        "q4_gate_up_64_token_tiles": 207.559542,
+        "q4_gate_up_128_token_tiles": 49.800043,
+        "q5_1_down": 162.019849,
+        "dense_ssm_input_with_convolution": 159.682802
+      }
+    },
+    "target_11_token_tail": {
+      "dispatches": 1951,
+      "kernel_ms": 93.983971,
+      "wall_ms": 105.97475
+    }
+  },
+  "experiments": [
+    {
+      "name": "Dense prefill row-group locality",
+      "mechanism": "Use the existing DenseF16GEMMKernel row-group template to group 2/4/8 output-row tiles, preserving each dot product's K order. Four rotating weight buffers exceed MALL capacity.",
+      "decision": "Rejected: only small/inconsistent early timing gains, and the standalone run did not complete its independent quality gate. No production dispatch was changed.",
+      "quality": "Completed 16384x2560 and 13312x2560 cases at 2048/2049 tokens retain original projection bytes and guards. The unchanged 2560x6144 baseline control then fails the standalone FP64 absolute-error gate: 0.0023353505 versus 0.002. The gate was not relaxed; this is not a qualified full sweep."
+    },
+    {
+      "name": "2176-token prefill capacity",
+      "mechanism": "Change only kPrefillChunkTokens from 2048 to 2176, aiming to fold a short appended tail into one chunk.",
+      "decision": "Rejected at the existing full-logit quality gate before candidate HTTP timing or deeper-context expansion.",
+      "production_build": "passes",
+      "assertion_enabled_test_build": "passes",
+      "test": "qwen38_flash_next_session_test --model FIRST.gguf --mtp-model MTP.gguf --prefill-only",
+      "passed_before_failure": [
+        "Frozen peer snapshot bytes, graph capture and replay logits",
+        "Independent AR/speculative state and mixed execution",
+        "136-token prompts split at 94/103/104/127/128/135 tokens: four full-logit rows each",
+        "2048-token prompt split at 1025 tokens: four full-logit rows"
+      ],
+      "failure": "prefill chunking changed logits: length=4096 boundary=2048 step=0",
+      "first_divergent_operator": "not yet isolated",
+      "candidate_speedup": null,
+      "candidate_memory_measurement": null
+    }
+  ],
+  "execution_notes": [
+    "An initial CLI profile stopped at the CLI's 4096-token context limit; retained data comes from the HTTP server with explicit 196608 capacity.",
+    "The HTTP profiler flushed its database but its server process remained alive during shutdown. An overlapping model-test attempt did not complete and is excluded. After terminating both processes, the isolated test retry produced the recorded full-logit failure.",
+    "Rejected production/source changes were reverted; exploratory source, binaries and raw logs remain in ignored local artifact/build directories."
+  ],
+  "restored_deployment": {
+    "container": "gufo-framework-flash-next-1",
+    "url": "http://127.0.0.1:18080/v1",
+    "ready": true,
+    "context_capacity": 196608,
+    "binary_hash_verified": true,
+    "smoke_answer": "READY",
+    "development_container_stopped": true
+  },
+  "raw_artifacts_sha256": {
+    "artifacts/framework/prefill-baseline-thinking-32k.json": "e5776105091bcd207f9d0ae69aa9888219160dac4ad4fccce5dce973b6cdd804",
+    "artifacts/framework/prefill-profile-http-baseline/summary.json": "4d89136df415a4b29432661ceb41712c4c0257dac3b11ad06fc43932b02c8ce4",
+    "artifacts/framework/prefill-profile-http-response.json": "ff025adb10f025b6a2ee351110fdee48c7155ae18b9eed942c85495370c1bf2c",
+    "artifacts/framework/prefill-profile-http-baseline/prefill_results.db": "728d15f0791d4a9ca055281579fa5675e62f89cc04faae3f30f7178333a7d55c",
+    "artifacts/framework/prefill-tile-micro.log": "5ee1cbb6dd1fcbdb2c5ddfcb4e81022806080ccd255bb25e15efd16cb7f44b41",
+    "artifacts/framework/prefill_tile_bench.hip": "fafc0e346d8c7301fead24d5b67a03fc8350661b1cdb9b1e72697022b770efc0",
+    "artifacts/framework/prefill-2176-quality.log": "446a1d96a0e32fee63053879da6ec0e3f0ee0397394ab8b74624a9da0c5b7ce1",
+    "artifacts/framework/prefill-2176-production-build.log": "0555ed3e7d43b8727039be0e1d8a6db509be3677311e2e1ebe6c0ec53d87328a",
+    "artifacts/framework/prefill-2176-test-build.log": "d8f523fdae638e75ca9be4a39ef462ca822b685f01602da54797d4d361158e04",
+    "artifacts/framework/prefill-restored-deployment.json": "5653a27b743cfcdd64b9e8bcd1a219999911782889f09140230fc5ce6424898b"
+  },
+  "next": "Capture the first differing layer/operator for 2176 versus 2048 prefill boundaries. Preserve the original full-logit gate before revisiting tail merging, then measure complete pp2048/tg128 HTTP turns at 32K and only expand a qualified win to 133K+."
+}
