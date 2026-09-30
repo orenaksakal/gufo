@@ -1,0 +1,66 @@
+name: gufo-framework
+services:
+  flash-next:
+    # Existing, measured runtime on this machine. Never silently pull another.
+    image: gufo-local:f783fedb-rocm10
+    pull_policy: never
+    user: "1000:1000"
+    group_add: ["990"]
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    ipc: host
+    ulimits:
+      memlock: {soft: -1, hard: -1}
+    ports:
+      - "127.0.0.1:18080:18080"
+    volumes:
+      - type: bind
+        source: ../../build/release/gufo
+        target: /usr/local/bin/gufo
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: /mnt/teamgroup/Models/Qwen3.8-Flash-Next-GGUF
+        target: /models
+        read_only: true
+        bind: {create_host_path: false}
+    command:
+      - gufo
+      - serve
+      - --host
+      - 0.0.0.0
+      - --port
+      - "18080"
+      - --sessions
+      - "1"
+      - llm
+      - --model
+      - /models/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf
+      - --served-model-name
+      - Qwen3.8-Flash-Next-UD-Q4_K_XL
+      - --mtp-model
+      - /models/MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf
+      - --speculative
+      - mtp
+      - --draft-tokens
+      - "7"
+      - --context
+      - "196608"
+      - --max-tokens
+      - "32768"
+      - --think
+      - "on"
+      - --temperature
+      - "1.0"
+      - --top-p
+      - "0.95"
+      - --top-k
+      - "20"
+      - --max-pending-per-client
+      - "8"
+    restart: unless-stopped
+    stop_grace_period: 120s
+    logging:
+      driver: json-file
+      options: {max-size: 30m, max-file: "3"}

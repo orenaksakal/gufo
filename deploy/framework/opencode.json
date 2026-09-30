@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "gufo/flash-next",
+  "compaction": {
+    "auto": true,
+    "keep": {"tokens": 32768},
+    "buffer": 16384
+  },
+  "providers": {
+    "gufo": {
+      "name": "Gufo Framework",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "http://127.0.0.1:18080/v1"
+      },
+      "models": {
+        "flash-next": {
+          "modelID": "Qwen3.8-Flash-Next-UD-Q4_K_XL",
+          "name": "Qwen3.8 Flash-Next (Framework)",
+          "capabilities": {
+            "tools": true,
+            "input": ["text"],
+            "output": ["text"]
+          },
+          "compatibility": {"reasoningField": "reasoning_content"},
+          "limit": {"context": 196608, "input": 163840, "output": 32768},
+          "body": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "cache_prompt": true,
+            "chat_template_kwargs": {
+              "enable_thinking": true,
+              "preserve_thinking": true
+            }
+          },
+          "variants": [
+            {
+              "id": "greedy",
+              "body": {"temperature": 0, "top_p": 1.0, "top_k": 0}
+            }
+          ]
+        }
+      }
+    }
+  }
+}

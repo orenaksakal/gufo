@@ -409,6 +409,12 @@ void CheckBatchedSessions(const std::shared_ptr<qfn::Model>& model) {
     Require(serial.back() && batched.back(), error);
     auto prompt = model->Tokenize("Batch request " + std::to_string(i) +
                                   ": Continue red, blue, blue, red,");
+    if (i == 0) {
+      const auto pattern = model->Tokenize("red, green, blue, ");
+      prompt.clear();
+      for (unsigned repeat = 0; repeat < 32; ++repeat)
+        prompt.insert(prompt.end(), pattern.begin(), pattern.end());
+    }
     // One member crosses the sparse-attention boundary while the others
     // remain short; interleaving must not share positions or pooling state.
     if (i == 1) {
@@ -478,6 +484,9 @@ void CheckBatchedSessions(const std::shared_ptr<qfn::Model>& model) {
                         batch_samplers[i].rng_state() &&
                     a.cycles == b.cycles && a.drafted == b.drafted &&
                     a.accepted == b.accepted &&
+                    a.lookup_cycles == b.lookup_cycles &&
+                    a.lookup_drafted == b.lookup_drafted &&
+                    a.lookup_accepted == b.lookup_accepted &&
                     std::equal(serial[i]->Tokens().begin(),
                                serial[i]->Tokens().end(),
                                batched[i]->Tokens().begin(),
@@ -520,6 +529,10 @@ void CheckBatchedSessions(const std::shared_ptr<qfn::Model>& model) {
   Require(
       sampled_acceptances > 0 && sampled_rejections > 0,
       "batch test must exercise sampled acceptance and residual correction");
+  Require(batched.front()->Statistics().lookup_accepted > 0,
+          "batch test must exercise accepted lookup proposals");
+  std::cout << "batch lookup_accepted="
+            << batched.front()->Statistics().lookup_accepted << '\n';
   std::cout << "batch sampled_accepted=" << sampled_acceptances
             << " rejected_cycles=" << sampled_rejections
             << " history_and_residual_exact=1\n"
@@ -716,6 +729,92 @@ void CheckServingSampling(const std::shared_ptr<qfn::Model>& model) {
   }
 }
 
+void CheckPromptLookup(const std::shared_ptr<qfn::Model>& model,
+                       std::uint32_t depth = 0) {
+  std::string error;
+  const auto capacity = depth ? depth + 256 : 6145;
+  auto copy = model->CreateSession(gufo::core::SessionMode::kSpeculative,
+                                   capacity, &error);
+  auto ar = model->CreateSession(gufo::core::SessionMode::kAutoregressive,
+                                 capacity, &error);
+  Require(copy && ar, error);
+  const auto pattern = model->Tokenize("red, green, blue, ");
+  std::vector<std::int32_t> prompt;
+  for (unsigned i = 0; i < 32; ++i)
+    prompt.insert(prompt.end(), pattern.begin(), pattern.end());
+  if (depth) {
+    prompt.resize(depth);
+    for (std::size_t i = 0; i < prompt.size(); ++i)
+      prompt[i] = pattern[i % pattern.size()];
+  }
+  const std::vector<sampling::TokenId> history(prompt.begin(), prompt.end());
+  Require(copy->Sync(prompt, &error) && ar->Sync(prompt, &error), error);
+  sampling::SamplerState a({.seed = 73}, history), b({.seed = 73}, history);
+  // The AR reference never enters speculative verification. Compare the
+  // entire vocabulary at every committed frontier, not just the output text.
+  std::size_t generated = 0;
+  while (generated < 64) {
+    qfn::Session::DecodeResult step;
+    Require(copy->DecodeStep(64 - generated, b, &step, &error, false), error);
+    Require(!step.tokens.empty(), "empty lookup verification");
+    for (const auto expected : step.tokens) {
+      qfn::Session::DecodeResult token;
+      Require(ar->DecodeStep(1, a, &token, &error, false), error);
+      Require(token.tokens == std::vector<std::int32_t>{expected},
+              "lookup changed greedy output");
+    }
+    RequireExact(ar->Logits(), copy->Logits(),
+                 "lookup changed frontier logits");
+    Require(a.rng_state() == b.rng_state(), "lookup changed greedy RNG");
+    generated += step.tokens.size();
+  }
+  const auto stats = copy->Statistics();
+  Require(stats.lookup_cycles > 0 && stats.lookup_accepted > 0,
+          "fixture did not exercise accepted lookup proposals");
+  const auto snapshot = copy->SaveSnapshot(&error);
+  Require(snapshot != nullptr, error);
+  const auto saved_sampler = b;
+  const auto generate = [&](sampling::SamplerState& sampler) {
+    std::vector<std::int32_t> out;
+    while (out.size() < 24) {
+      qfn::Session::DecodeResult step;
+      Require(copy->DecodeStep(24 - out.size(), sampler, &step, &error, false),
+              error);
+      Require(!step.tokens.empty(), "empty lookup replay");
+      out.insert(out.end(), step.tokens.begin(), step.tokens.end());
+    }
+    return out;
+  };
+  const auto expected = generate(b);
+  const std::vector<float> logits(copy->Logits().begin(), copy->Logits().end());
+  Require(copy->RestoreSnapshot(*snapshot, &error), error);
+  b = saved_sampler;
+  Require(generate(b) == expected,
+          "rebuilt lookup index changed snapshot replay");
+  RequireExact(logits, copy->Logits(), "lookup snapshot logits changed");
+  Require(copy->Statistics().lookup_accepted > 0,
+          "restored fixture did not exercise lookup");
+
+  Require(copy->RestoreSnapshot(*snapshot, &error), error);
+  sampling::SamplerState sampled(
+      {.temperature = 1.0F, .top_k = 20, .top_p = 0.95F, .seed = 73}, history);
+  const auto sampled_before = sampled;
+  const auto sampled_tokens = generate(sampled);
+  const auto sampled_rng = sampled.rng_state();
+  Require(copy->Statistics().lookup_cycles == 0,
+          "lookup altered stochastic proposal policy");
+  Require(copy->RestoreSnapshot(*snapshot, &error), error);
+  sampled = sampled_before;
+  Require(
+      generate(sampled) == sampled_tokens && sampled.rng_state() == sampled_rng,
+      "lookup changed sampled snapshot replay");
+  std::cout << "prompt lookup depth=" << prompt.size() << ": "
+            << stats.lookup_cycles << " cycles, " << stats.lookup_accepted
+            << '/' << stats.lookup_drafted
+            << " accepted; greedy tokens/full logits/RNG, snapshot and sampled "
+               "replay exact\n";
+}
+
 int main(int argc, char** argv) {
   const bool batch_only =
       argc == 6 && std::string_view(argv[5]) == "--batch-only";
@@ -723,20 +822,30 @@ int main(int argc, char** argv) {
       argc == 6 && std::string_view(argv[5]) == "--prefill-only";
   const bool sampling_only =
       argc == 6 && std::string_view(argv[5]) == "--sampling-only";
-  if ((argc != 5 && !batch_only && !prefill_only && !sampling_only) ||
+  const bool lookup_only =
+      argc == 6 && std::string_view(argv[5]) == "--lookup-only";
+  if ((argc != 5 && !batch_only && !prefill_only && !sampling_only &&
+       !lookup_only) ||
       std::string_view(argv[1]) != "--model" ||
       std::string_view(argv[3]) != "--mtp-model") {
     std::cerr << "Usage: session_test --model FIRST.gguf --mtp-model MTP.gguf "
-                 "[--batch-only | --prefill-only | --sampling-only]\n";
+                 "[--batch-only | --prefill-only | --sampling-only | "
+                 "--lookup-only]\n";
     return 77;
   }
   try {
     std::string error;
-    auto model = qfn::Model::Load(
-        argv[2],
-        {.max_context = 6145, .mtp_model_path = argv[4], .max_draft_tokens = 7},
-        &error);
+    auto model = qfn::Model::Load(argv[2],
+                                  {.max_context = lookup_only ? 33024U : 6145U,
+                                   .mtp_model_path = argv[4],
+                                   .max_draft_tokens = 7},
+                                  &error);
     Require(model != nullptr, error);
+    if (lookup_only) {
+      CheckPromptLookup(model);
+      CheckPromptLookup(model, 32768);
+      return 0;
+    }
     CheckSnapshotDuringGraphCapture(model);
     CheckExecutionModes(model);
     if (sampling_only) {
@@ -752,6 +861,7 @@ int main(int argc, char** argv) {
     CheckImageSnapshotAttachment(model);
     CheckBatchFailureIsolation(model);
     CheckBatchedSessions(model);
+    CheckPromptLookup(model);
     if (batch_only)
       return 0;
     const auto pattern = model->Tokenize(

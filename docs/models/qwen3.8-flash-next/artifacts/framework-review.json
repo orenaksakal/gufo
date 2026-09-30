@@ -1,0 +1,701 @@
+{
+  "schema": "gufo.framework-review.v1",
+  "measured_at_utc": "2026-09-30T02:27:29.363046+00:00",
+  "upstream_revision": "f783fedb9bea2ec7de941f6da4e02f4a4596b29e",
+  "machine": "Framework Desktop, Ryzen AI Max+ 395 / Radeon 8060S gfx1151, 128 GB, Ubuntu 26.04, kernel 7.0.0-34-generic",
+  "toolchain": {
+    "gcc": "16.2.1-2.fc44",
+    "rocm_package": "amdrocm-core-devel10.0-gfx1151-10.0.0-4",
+    "hip": "7.15.26333-0000000",
+    "amd_clang": "23.0.0git"
+  },
+  "runtime_image_sha256": "d672f04aa4af859388d5f06a23b19036b9c67573d7264d2dbf303b5969e97444",
+  "toolchain_image_sha256": "05722e5bfda1e7639b1809e70df524b0c27e9d3c41313ea95695cb1895fe6236",
+  "binary_sha256": {
+    "baseline": "608541136a7b43663bae61112ce7a590c0859477c66c0f2fcc15c21f75cd6c97",
+    "candidate": "06b4f2768e1073618e2ef6125d85b8f09de70529e44dd16782b9e20383a29d7b"
+  },
+  "candidate_source_sha256": {
+    "engine.cpp": "ed06720112eae7c1bcdfdff619214bd18bf8b4e444a904e765d61a2ae4136eb6",
+    "engine.hpp": "2b2f5b0f35fbb7db27f186c626c79adb0c037e26537e049ea2e1f51d135a52b1",
+    "prompt_lookup.hpp": "7aea2e5b1990951f517e70694b60611742e2c9bb29bd1174e919815158179783"
+  },
+  "model_identities": "model-identities.json",
+  "settings": {
+    "context_capacity": 196608,
+    "sessions": 1,
+    "draft_ceiling": 7,
+    "thinking": false,
+    "seed": 73,
+    "warmups_per_case": 1,
+    "measured_repetitions": 3,
+    "cache_prompt": false,
+    "output_budget": 128,
+    "decode_rate_scope": "completion_tokens / server decode_ms; loading and prefill excluded",
+    "quality_scope": "Exact replay against the same quantized Gufo model, not original unquantized-model equivalence or agent task success."
+  },
+  "http": {
+    "prose": {
+      "prompt_tokens": 1965,
+      "prompt_sha256": "38458f639832c7cc42cb50bc0c89d8f16ac2ace99d4f1289d7e1b0fc507ca12e",
+      "temperature": 0.0,
+      "extra_body": {
+        "seed": 73,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "exact_replay_requests": 3,
+      "completion_sha256": [
+        "5c5c15f0b1f44f613f46f0a88a82eca439e6c250cce4b0ed1913634c901632a4"
+      ],
+      "baseline": {
+        "median_decode_tps": 37.3505355909377,
+        "median_prefill_tps": 1557.9324075350526,
+        "median_wall_ms": 4745.189909008332,
+        "decode_ms": [
+          3426.9923570000005,
+          3433.1515050000007,
+          3426.535091999999
+        ],
+        "wall_ms": [
+          4748.477389017353,
+          4740.401046001352,
+          4745.189909008332
+        ]
+      },
+      "candidate": {
+        "median_decode_tps": 37.39880570525303,
+        "median_prefill_tps": 1557.66021001369,
+        "median_wall_ms": 4746.223608992295,
+        "decode_ms": [
+          3431.951339999999,
+          3422.5691859999993,
+          3419.7566460000007
+        ],
+        "wall_ms": [
+          4746.223608992295,
+          4778.413123014616,
+          4724.975860997802
+        ]
+      },
+      "decode_gain_percent": 0.129235400648553
+    },
+    "copy-code": {
+      "prompt_tokens": 1068,
+      "prompt_sha256": "fa235aa5bdc59ee150f78a0bc753ead2e1ecc4bd50eb3b80e1cc3f1077c22fb2",
+      "temperature": 0.0,
+      "extra_body": {
+        "seed": 73,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "exact_replay_requests": 3,
+      "completion_sha256": [
+        "c32ef5f77808a6d88c4f737141a4545c841520477189dc747d324331e56f6e79"
+      ],
+      "baseline": {
+        "median_decode_tps": 73.66773983125066,
+        "median_prefill_tps": 1225.5595385309784,
+        "median_wall_ms": 2658.653279999271,
+        "decode_ms": [
+          1736.3104810000002,
+          1745.7162090000002,
+          1737.5312490000001
+        ],
+        "wall_ms": [
+          2657.0592329953797,
+          2668.686524993973,
+          2658.653279999271
+        ]
+      },
+      "candidate": {
+        "median_decode_tps": 83.29647491433111,
+        "median_prefill_tps": 1227.0489202552005,
+        "median_wall_ms": 2451.8751770083327,
+        "decode_ms": [
+          1535.2749130000002,
+          1538.430006,
+          1536.679675
+        ],
+        "wall_ms": [
+          2460.939373995643,
+          2448.793254006887,
+          2451.8751770083327
+        ]
+      },
+      "decode_gain_percent": 13.070490699371028
+    },
+    "edit-code": {
+      "prompt_tokens": 1088,
+      "prompt_sha256": "02caa5709fac26f59377bb0b02655af91593a6e196ddd2e1d313f2d65851d399",
+      "temperature": 0.0,
+      "extra_body": {
+        "seed": 73,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "exact_replay_requests": 3,
+      "completion_sha256": [
+        "c32ef5f77808a6d88c4f737141a4545c841520477189dc747d324331e56f6e79"
+      ],
+      "baseline": {
+        "median_decode_tps": 71.32607859999568,
+        "median_prefill_tps": 1225.9556338532552,
+        "median_wall_ms": 2732.7480870008003,
+        "decode_ms": [
+          1782.3916210000002,
+          1794.575035,
+          1797.1186880000002
+        ],
+        "wall_ms": [
+          2721.190376993036,
+          2732.7480870008003,
+          2734.4879989977926
+        ]
+      },
+      "candidate": {
+        "median_decode_tps": 84.82767128685704,
+        "median_prefill_tps": 1229.6265363252592,
+        "median_wall_ms": 2439.3678460037336,
+        "decode_ms": [
+          1508.941576,
+          1503.6688470000001,
+          1509.2403889999998
+        ],
+        "wall_ms": [
+          2440.1543799904175,
+          2435.366949008312,
+          2439.3678460037336
+        ]
+      },
+      "decode_gain_percent": 18.9293915379531
+    },
+    "repetition": {
+      "prompt_tokens": 1911,
+      "prompt_sha256": "b67edeee57143f37684ba1efdbfb39223e17071c4b531700f88066c2274bf1d6",
+      "temperature": 0.0,
+      "extra_body": {
+        "seed": 73,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "exact_replay_requests": 3,
+      "completion_sha256": [
+        "e736ed6887f41502fe74dba15190d5d2218018d2a5955d3449770c9fb5557211"
+      ],
+      "baseline": {
+        "median_decode_tps": 83.24401570200912,
+        "median_prefill_tps": 1548.1142297835815,
+        "median_wall_ms": 2830.2725570101757,
+        "decode_ms": [
+          1535.890013,
+          1544.541492,
+          1537.6480689999999
+        ],
+        "wall_ms": [
+          2830.2725570101757,
+          2831.320984987542,
+          2827.5872119993437
+        ]
+      },
+      "candidate": {
+        "median_decode_tps": 105.73186883438956,
+        "median_prefill_tps": 1553.6161481265733,
+        "median_wall_ms": 2493.4002910158597,
+        "decode_ms": [
+          1211.333028,
+          1210.6094540000004,
+          1209.5332030000002
+        ],
+        "wall_ms": [
+          2487.6829969871324,
+          2493.4002910158597,
+          2494.804941001348
+        ]
+      },
+      "decode_gain_percent": 27.01437808200029
+    },
+    "sampled-code": {
+      "prompt_tokens": 1088,
+      "prompt_sha256": "02caa5709fac26f59377bb0b02655af91593a6e196ddd2e1d313f2d65851d399",
+      "temperature": 1.0,
+      "extra_body": {
+        "seed": 73,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        },
+        "top_k": 20,
+        "top_p": 0.95
+      },
+      "exact_replay_requests": 3,
+      "completion_sha256": [
+        "c32ef5f77808a6d88c4f737141a4545c841520477189dc747d324331e56f6e79"
+      ],
+      "baseline": {
+        "median_decode_tps": 67.29356684104994,
+        "median_prefill_tps": 1224.259824662588,
+        "median_wall_ms": 2837.8952850180212,
+        "decode_ms": [
+          1894.574413,
+          1914.060986,
+          1902.1134710000001
+        ],
+        "wall_ms": [
+          2833.5274969867896,
+          2854.2002289905213,
+          2837.8952850180212
+        ]
+      },
+      "candidate": {
+        "median_decode_tps": 67.37141330076537,
+        "median_prefill_tps": 1226.276588925292,
+        "median_wall_ms": 2836.684891983168,
+        "decode_ms": [
+          1899.9156130000001,
+          1902.1778619999998,
+          1898.778543
+        ],
+        "wall_ms": [
+          2836.684891983168,
+          2838.8897400000133,
+          2833.1289849884342
+        ]
+      },
+      "decode_gain_percent": 0.11568187476123093
+    }
+  },
+  "opencode": {
+    "long-cold": {
+      "prompt_tokens": 133131,
+      "completion_tokens": 128,
+      "request_sha256": "0507698ab3fa5bf4c18446721ea4eca3e9a95064eb80c5203c4c1863e3d8f096",
+      "message_sha256": "8b3b1fac8c3de8c1dd3781058668a870589beea48310a96653ef28fe8ba09b76",
+      "finish_reason": "length",
+      "exact_replay": true,
+      "baseline": {
+        "cached_tokens": 0,
+        "prefill_tokens": 133131,
+        "prefill_ms": 93343.42489799997,
+        "decode_ms": 2090.388535,
+        "wall_ms": 95881.56306598103
+      },
+      "candidate": {
+        "cached_tokens": 0,
+        "prefill_tokens": 133131,
+        "prefill_ms": 94100.58485199997,
+        "decode_ms": 2079.5484209999995,
+        "wall_ms": 96604.15109602036
+      }
+    },
+    "long-greedy": {
+      "prompt_tokens": 134063,
+      "completion_tokens": 18,
+      "request_sha256": "10f73e425e9f0959ac291ccb99031c76c460c336de3e42073883f40e2369063c",
+      "message_sha256": "1fad4bee55f5042bbceb253531d6ca4a98dac1ecb50ce1c77732fcd783d0724b",
+      "finish_reason": "stop",
+      "exact_replay": true,
+      "baseline": {
+        "cached_tokens": 133131,
+        "prefill_tokens": 932,
+        "prefill_ms": 849.915905,
+        "decode_ms": 360.237245,
+        "wall_ms": 3286.142065015156
+      },
+      "candidate": {
+        "cached_tokens": 133131,
+        "prefill_tokens": 932,
+        "prefill_ms": 852.753556,
+        "decode_ms": 280.05254199999996,
+        "wall_ms": 2578.717816999415
+      }
+    },
+    "long-greedy-replay": {
+      "prompt_tokens": 134063,
+      "completion_tokens": 18,
+      "request_sha256": "10f73e425e9f0959ac291ccb99031c76c460c336de3e42073883f40e2369063c",
+      "message_sha256": "1fad4bee55f5042bbceb253531d6ca4a98dac1ecb50ce1c77732fcd783d0724b",
+      "finish_reason": "stop",
+      "exact_replay": true,
+      "baseline": {
+        "cached_tokens": 134063,
+        "prefill_tokens": 0,
+        "prefill_ms": 0,
+        "decode_ms": 308.301776,
+        "wall_ms": 380.65480801742524
+      },
+      "candidate": {
+        "cached_tokens": 134063,
+        "prefill_tokens": 0,
+        "prefill_ms": 0,
+        "decode_ms": 269.869004,
+        "wall_ms": 340.51263201399706
+      }
+    },
+    "long-sampled": {
+      "prompt_tokens": 134063,
+      "completion_tokens": 13,
+      "request_sha256": "565dd4cc4b3a36893a69721234af75be2dd19bcd0dc96eb4c0c9876a5bdd6f2f",
+      "message_sha256": "2f19f85613c8390f417fe0d3a7083331d3cbd17893c441a6eb6f34798c50fffc",
+      "finish_reason": "stop",
+      "exact_replay": true,
+      "baseline": {
+        "cached_tokens": 134063,
+        "prefill_tokens": 0,
+        "prefill_ms": 0,
+        "decode_ms": 307.174511,
+        "wall_ms": 379.16089000646025
+      },
+      "candidate": {
+        "cached_tokens": 134063,
+        "prefill_tokens": 0,
+        "prefill_ms": 0,
+        "decode_ms": 304.80445,
+        "wall_ms": 374.202167004114
+      }
+    },
+    "long-sampled-replay": {
+      "prompt_tokens": 134063,
+      "completion_tokens": 13,
+      "request_sha256": "565dd4cc4b3a36893a69721234af75be2dd19bcd0dc96eb4c0c9876a5bdd6f2f",
+      "message_sha256": "2f19f85613c8390f417fe0d3a7083331d3cbd17893c441a6eb6f34798c50fffc",
+      "finish_reason": "stop",
+      "exact_replay": true,
+      "baseline": {
+        "cached_tokens": 134063,
+        "prefill_tokens": 0,
+        "prefill_ms": 0,
+        "decode_ms": 305.745785,
+        "wall_ms": 376.49877899093553
+      },
+      "candidate": {
+        "cached_tokens": 134063,
+        "prefill_tokens": 0,
+        "prefill_ms": 0,
+        "decode_ms": 305.79490699999997,
+        "wall_ms": 378.9756509941071
+      }
+    },
+    "streamed-thinking-tool": {
+      "prompt_tokens": 344,
+      "completion_tokens": 43,
+      "request_sha256": "7f073c65884983816d30a2f0fd4499f05e8f26ad8d0c7cd0984e510e5626dcc1",
+      "message_sha256": "5553022d4ba9f7c11c70d5f3e110ddd6fd47e088175de310dee6d9fad76d5a79",
+      "finish_reason": "tool_calls",
+      "exact_replay": true,
+      "baseline": {
+        "cached_tokens": 0,
+        "prefill_tokens": 344,
+        "prefill_ms": 540.178711,
+        "decode_ms": 668.5048590000001,
+        "wall_ms": 1292.2267469984945
+      },
+      "candidate": {
+        "cached_tokens": 0,
+        "prefill_tokens": 344,
+        "prefill_ms": 536.766113,
+        "decode_ms": 650.473546,
+        "wall_ms": 1267.4791989848018
+      }
+    },
+    "streamed-tool-result": {
+      "prompt_tokens": 113,
+      "completion_tokens": 5,
+      "request_sha256": "108883bff2054c09d9504a0c7e51aca13944f909d38d4270b75af5a36e568ad1",
+      "message_sha256": "04505f93bfd222c18565efa7151292dfdb43243b8acb66c6ce245215bfc4a830",
+      "finish_reason": "stop",
+      "exact_replay": true,
+      "baseline": {
+        "cached_tokens": 0,
+        "prefill_tokens": 113,
+        "prefill_ms": 321.410732,
+        "decode_ms": 164.318898,
+        "wall_ms": 527.2317100025248
+      },
+      "candidate": {
+        "cached_tokens": 0,
+        "prefill_tokens": 113,
+        "prefill_ms": 321.840874,
+        "decode_ms": 161.64574499999998,
+        "wall_ms": 527.6758380059619
+      }
+    },
+    "structured-json": {
+      "prompt_tokens": 64,
+      "completion_tokens": 5,
+      "request_sha256": "51b8931d47ac44877e6f3f63de88d5d5546c3b97c737b2bc5ce06fbfd39e9806",
+      "message_sha256": "42ef2f55accf75e8c429801a01b6f5ed9cec011669a05f63c5f7ed150b494400",
+      "finish_reason": "stop",
+      "exact_replay": true,
+      "baseline": {
+        "cached_tokens": 0,
+        "prefill_tokens": 64,
+        "prefill_ms": 264.174945,
+        "decode_ms": 157.154854,
+        "wall_ms": 541.1429300147574
+      },
+      "candidate": {
+        "cached_tokens": 0,
+        "prefill_tokens": 64,
+        "prefill_ms": 263.891941,
+        "decode_ms": 158.923539,
+        "wall_ms": 555.6425190006848
+      }
+    }
+  },
+  "profile": {
+    "baseline": {
+      "dispatches": 38742,
+      "total_ms": 2351.382802,
+      "busy_ms": 2351.381437,
+      "wall_ms": 2710.437955,
+      "invalid_dispatches": 0,
+      "stages": {
+        "other": {
+          "calls": 3820,
+          "ms": 16.797476
+        },
+        "attention": {
+          "calls": 958,
+          "ms": 52.216601
+        },
+        "quantize": {
+          "calls": 10122,
+          "ms": 20.648148
+        },
+        "dense: int8 projections": {
+          "calls": 198,
+          "ms": 60.380436
+        },
+        "hyperconnections: residual": {
+          "calls": 1946,
+          "ms": 80.238032
+        },
+        "dense: f16 projections": {
+          "calls": 314,
+          "ms": 199.163381
+        },
+        "hyperconnections: mixing": {
+          "calls": 2073,
+          "ms": 20.203078
+        },
+        "moe: routing/layout": {
+          "calls": 1947,
+          "ms": 11.687888
+        },
+        "runtime: fill": {
+          "calls": 143,
+          "ms": 0.208067
+        },
+        "runtime: copy": {
+          "calls": 617,
+          "ms": 1.672294
+        },
+        "moe: f16 projections": {
+          "calls": 90,
+          "ms": 305.524503
+        },
+        "ssm: convolution/prologue": {
+          "calls": 645,
+          "ms": 6.507192
+        },
+        "ssm: deltanet": {
+          "calls": 1968,
+          "ms": 76.62993
+        },
+        "norm": {
+          "calls": 551,
+          "ms": 8.616167
+        },
+        "hyperconnections: down projection": {
+          "calls": 1983,
+          "ms": 36.361703
+        },
+        "dense: quantized vectors": {
+          "calls": 6282,
+          "ms": 742.334028
+        },
+        "embed": {
+          "calls": 129,
+          "ms": 0.840901
+        },
+        "mtp: support": {
+          "calls": 224,
+          "ms": 3.829053
+        },
+        "moe/dense: mmq": {
+          "calls": 3,
+          "ms": 0.462474
+        },
+        "dense: small projections": {
+          "calls": 1854,
+          "ms": 45.898304
+        },
+        "moe: quantized vectors": {
+          "calls": 1022,
+          "ms": 276.045706
+        },
+        "sample": {
+          "calls": 222,
+          "ms": 0.883675
+        },
+        "moe: grouped gate/up": {
+          "calls": 1631,
+          "ms": 384.233765
+        }
+      }
+    },
+    "candidate": {
+      "dispatches": 36951,
+      "total_ms": 2150.461406,
+      "busy_ms": 2150.461406,
+      "wall_ms": 2445.647038,
+      "invalid_dispatches": 0,
+      "stages": {
+        "other": {
+          "calls": 3729,
+          "ms": 16.633033
+        },
+        "attention": {
+          "calls": 763,
+          "ms": 52.028179
+        },
+        "quantize": {
+          "calls": 9575,
+          "ms": 20.643466
+        },
+        "dense: int8 projections": {
+          "calls": 198,
+          "ms": 60.12315
+        },
+        "hyperconnections: residual": {
+          "calls": 1960,
+          "ms": 80.719588
+        },
+        "dense: f16 projections": {
+          "calls": 316,
+          "ms": 198.391573
+        },
+        "hyperconnections: mixing": {
+          "calls": 2000,
+          "ms": 20.971422
+        },
+        "moe: routing/layout": {
+          "calls": 1961,
+          "ms": 12.077013
+        },
+        "runtime: fill": {
+          "calls": 143,
+          "ms": 0.223387
+        },
+        "runtime: copy": {
+          "calls": 458,
+          "ms": 1.811803
+        },
+        "moe: f16 projections": {
+          "calls": 90,
+          "ms": 305.405167
+        },
+        "ssm: convolution/prologue": {
+          "calls": 717,
+          "ms": 6.856785
+        },
+        "ssm: deltanet": {
+          "calls": 2364,
+          "ms": 91.116503
+        },
+        "norm": {
+          "calls": 207,
+          "ms": 3.962437
+        },
+        "hyperconnections: down projection": {
+          "calls": 1910,
+          "ms": 35.695807
+        },
+        "dense: quantized vectors": {
+          "calls": 5796,
+          "ms": 476.610855
+        },
+        "embed": {
+          "calls": 42,
+          "ms": 0.421073
+        },
+        "mtp: support": {
+          "calls": 46,
+          "ms": 1.932247
+        },
+        "moe/dense: mmq": {
+          "calls": 3,
+          "ms": 0.503549
+        },
+        "dense: small projections": {
+          "calls": 1868,
+          "ms": 47.418588
+        },
+        "moe: quantized vectors": {
+          "calls": 938,
+          "ms": 283.175676
+        },
+        "sample": {
+          "calls": 44,
+          "ms": 0.181585
+        },
+        "moe: grouped gate/up": {
+          "calls": 1823,
+          "ms": 433.55852
+        }
+      }
+    },
+    "scope": "Separate CLI copy-code tg128 trace, inference pass 102 after excluding loading via prof.py --passes 50 --pass 102; one trace per arm. Instrumented, not a headline speed measurement.",
+    "token_id_sha256": "e0b77aa66dd409f6950b0546713716bbbbdc100aa6ec4624b2c5c98cb227cfa0"
+  },
+  "quality": {
+    "lookup_cpu": "Bounds/append/reset/rebuild/collision tests and standalone ASan/UBSan pass.",
+    "lookup_gpu": [
+      {
+        "prompt_tokens": 224,
+        "cycles": 8,
+        "copied_proposals": 45,
+        "accepted": 41
+      },
+      {
+        "prompt_tokens": 32768,
+        "cycles": 8,
+        "copied_proposals": 48,
+        "accepted": 48
+      }
+    ],
+    "lookup_contract": "Tokens, entire vocabulary logits and RNG exact against scalar AR at each committed frontier; snapshot rebuild and seeded sampled replay exact.",
+    "batch": "C2/C4/C6/C8 full logits, RNG, token history, lookup statistics and state exact; 21 copied tokens accepted. Cancellation isolation passes.",
+    "sampling": "23 configurations, AR/MTP serving replay and C2/budgets pass.",
+    "snapshot": "4095-token round trips exact.",
+    "images": "Unavailable: matching vision sidecar not installed."
+  },
+  "continuation": [
+    {
+      "case": "content-preserve1-sampled0",
+      "sha256": "fbeca176ea787fcc9debbd33a1696d723925915d61a480c98881de1a603193ed",
+      "cached": 602,
+      "prefill": 13,
+      "exact": true
+    },
+    {
+      "case": "reasoning_content-preserve1-sampled1",
+      "sha256": "de579bd85f6c55a8dc1310aeb05628927f3195506fa96853741280ac60dc26aa",
+      "cached": 648,
+      "prefill": 11,
+      "exact": true
+    }
+  ],
+  "opencode_client": {
+    "version": "2.0.20",
+    "model": "gufo/flash-next",
+    "passed": true,
+    "scope": "Standalone client read-tool round trip against the production candidate; exact expected synthetic file marker returned.",
+    "trace_sha256": "b9b9aba85130a1cd44221c1573a00567e7f4e93fc907e011ecf503d551f1ff9e",
+    "steps": 2
+  }
+}

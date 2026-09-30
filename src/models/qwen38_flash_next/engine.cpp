@@ -266,6 +266,7 @@ void Session::Reset() {
   valid_ = false;
   session_->Reset();
   tokens_.clear();
+  prompt_lookup_.Reset();
   hidden_base_ = 0;
   draft_length_.Reset();
   model_->executor_->MtpRewind(*session_, 0);
@@ -434,6 +435,7 @@ bool Session::RestoreSnapshot(std::span<const std::uint8_t> payload,
     return false;
   }
   tokens_ = std::move(tokens);
+  prompt_lookup_.Reset();
   logits_ = std::move(logits);
   hidden_base_ = info.position - info.hidden_rows;
   draft_token_ = 0;
@@ -615,7 +617,9 @@ struct Session::PendingDecode {
   bool sampled{false};
   bool gpu_greedy{false};
   bool gpu_verification{false};
+  bool lookup{false};
   std::size_t width{0};
+  std::size_t capacity{0};
   std::optional<sampling::SamplerState> draft_sampler;
   std::uint64_t draft_rng{0};
   MtpCandidateLogits candidates;
@@ -630,6 +634,21 @@ void Session::AppendDraft(PendingDecode& pending) {
     pending.draft_sampler->Accept(pending.proposals.back().token);
   }
   pending.chain.push_back(pending.draft);
+}
+
+void Session::AppendLookup(PendingDecode& pending) {
+  // The first MTP proposal anchors the copy. Stochastic requests retain their
+  // original proposal distributions and RNG draws. Image contexts retain MTP.
+  if (pending.sampled || pending.chain.size() != 2 || pending.capacity < 4 ||
+      image_prompt_)
+    return;
+  const auto tail = prompt_lookup_.Propose(
+      tokens_, pending.chain, pending.capacity - pending.chain.size());
+  if (tail.empty())
+    return;
+  pending.chain.insert(pending.chain.end(), tail.begin(), tail.end());
+  pending.width = pending.chain.size();
+  pending.lookup = true;
 }
 
 bool Session::PrepareDecode(const DecodeRequest& request,
@@ -697,6 +716,7 @@ bool Session::PrepareDecode(const DecodeRequest& request,
   pending->chain = {anchor};
   pending->draft = draft_token_;
   pending->width = width;
+  pending->capacity = cap;
   pending->base = base;
   pending->speculative = true;
   pending->sampled = sampled;
@@ -706,9 +726,10 @@ bool Session::PrepareDecode(const DecodeRequest& request,
     verify_logits_.resize(exec.max_speculative() * model_->VocabSize());
   }
   if (!defer_head) {
-    while (pending->chain.size() < width) {
+    while (pending->chain.size() < pending->width) {
       AppendDraft(*pending);
-      if (pending->chain.size() < width &&
+      AppendLookup(*pending);
+      if (pending->chain.size() < pending->width &&
           !exec.MtpForward(
               *session_, std::span<const std::int32_t>(&pending->draft, 1), -1,
               {.token = sampled ? nullptr : &pending->draft,
@@ -817,7 +838,17 @@ bool Session::FinishDecode(const DecodeRequest& request,
   stats_.accepted += keep - 1;
   // A target stop ends the request; it does not classify the remaining
   // proposals as failed predictions.
-  draft_length_.Observe(keep - 1, result->stop ? keep - 1 : k - 1, base);
+  if (pending.lookup) {
+    ++stats_.lookup_cycles;
+    stats_.lookup_drafted += k - 2;
+    stats_.lookup_accepted += keep > 2 ? keep - 2 : 0;
+    // Only the first proposal came from MTP. Copy acceptance must not train
+    // the MTP length controller on predictions the head never made.
+    const auto accepted = std::min(keep - 1, 1U);
+    draft_length_.Observe(accepted, result->stop ? accepted : 1U, base);
+  } else {
+    draft_length_.Observe(keep - 1, result->stop ? keep - 1 : k - 1, base);
+  }
 
   // The next call knows the next sampled anchor. Defer draft catch-up until
   // then, retaining this session's target hidden rows across interleaving.
@@ -1058,6 +1089,7 @@ bool Session::DecodeBatchImpl(std::span<const DecodeRequest> requests,
           p.chain.size() >= p.width)
         continue;
       AppendDraft(p);
+      requests[i].session->AppendLookup(p);
       if (p.chain.size() < p.width)
         bodies.push_back({requests[i].session->session_.get(),
                           std::span<const std::int32_t>(&p.draft, 1), -1});
@@ -1110,6 +1142,7 @@ bool Session::DecodeBatchImpl(std::span<const DecodeRequest> requests,
     }
   }
   if (batch_drafts && items.size() == requests.size() &&
+      std::ranges::none_of(pending, [](const auto& p) { return p.lookup; }) &&
       std::ranges::all_of(requests,
                           [](const auto& r) { return r.outcome->completed; })) {
     const auto ms = std::chrono::duration<float, std::milli>(

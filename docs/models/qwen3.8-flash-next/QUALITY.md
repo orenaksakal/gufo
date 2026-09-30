@@ -54,6 +54,36 @@ and [SGLang](https://github.com/sgl-project/sglang/blob/993d1fccbaafe3e79d91567d
 formulas supply independent predictor checks; pinned Transformers ignores MTP
 weights. [Vision reproduction](../qwen3.8-27b/QUALITY.md#vision).
 
+## Framework prompt-lookup fork
+
+The Framework qualification uses the same target/MTP hashes listed above, on
+the local GCC 16.2.1 / ROCm 10 runtime. The new lookup index supplies greedy
+proposals to the existing target verifier; target arithmetic, weights, attention
+selection and KV precision are preserved. Sampled and image requests bypass
+lookup. These are regression checks against this quantized model.
+
+| Check | Result |
+| --- | --- |
+| CPU lookup bounds/state | Append, budget limits, reset/rebuild and forced table collisions pass; standalone ASan/UBSan pass |
+| Greedy lookup versus scalar AR | At 224 and 32,768 prompt tokens: output tokens, complete vocabulary logits and RNG exact at every committed frontier |
+| Lookup coverage | 41/45 copied proposals accepted in the short fixture; 48/48 at 32K, across eight cycles each |
+| Restored lookup | Rebuilt index preserves greedy tokens/full logits and seeded sampled replay; sampled lookup-cycle count remains zero |
+| Shared batch behavior | C2/C4/C6/C8 AR/MTP logits, tokens, RNG and lookup statistics exact; 21 accepted copied tokens in mixed sampled/greedy cohorts; independent state and cancellation isolation pass |
+| Sampling | Existing 23-configuration serving suite passes with AR/MTP and C2/budget replay |
+| Persistent state | Snapshot round trips exact at 4,095 tokens |
+| Paired production HTTP | 15/15 tg128 byte hashes and token counts match upstream at capacity 196,608; prose, copy/edit, repetition and sampled control |
+| Long tool history | 133,131-token cold input and 134,063-token continued input; baseline message/count agreement and greedy/sampled cached replay exact; only 932 appended tokens prefilled, zero on repeat |
+| OpenCode HTTP contract | Streamed reasoning and tool-call arguments, tool-result replay and strict JSON output match baseline; two cancellation/three-turn cases retain their prefixes and seeded output |
+| OpenCode V2 client | v2.0.20 standalone run completes a real `read` tool round trip and returns the exact marker from a synthetic local file |
+
+Long continuations reach EOS at 18 greedy / 13 sampled tokens; the cold request
+fills tg128. These are bounded replay/serving checks, not complete-file task
+scores. [Retained evidence](artifacts/framework-review.json).
+
+No vision sidecar is installed on this machine, so local image qualification is
+unavailable. The upstream vision gap described above still applies.
+Reproduction and HTTP/OpenCode results: [Framework guide](FRAMEWORK.md).
+
 ## Benchmark method
 
 Gufo single-user TG refreshed September 27, 2026 (`f797b5b`); PP and other

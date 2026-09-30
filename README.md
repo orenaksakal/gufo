@@ -1,4 +1,17 @@
-# Gufo: the Strix Halo inference engine
+# Gufo Framework: Qwen3.8 Flash-Next on Ryzen AI Max+ 395
+
+Machine-focused fork of [gufo-org/gufo](https://github.com/gufo-org/gufo).
+The `framework-flash-next` branch adds target-verified prompt-lookup speculation
+for greedy text, alongside Gufo's MTP drafter, with bounded session-private
+indexing and exact replay checks.
+
+The Framework deployment provides a 192K-token total context and an OpenCode V2
+profile with 160K input / 32K output budgets for long coding conversations.
+
+**[Machine setup, validation and results](docs/models/qwen3.8-flash-next/FRAMEWORK.md)**
+· **[Research: Halogen, llama.cpp, vLLM, SGLang and hipEngine](docs/models/qwen3.8-flash-next/FRAMEWORK_RESEARCH.md)**
+
+## Upstream Gufo
 
 <p align="center">
   <img src="assets/gufo-logo.jpg" alt="Gufo logo" width="180">

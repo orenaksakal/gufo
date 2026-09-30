@@ -58,6 +58,16 @@
 | Side-stream inject/shared-expert overlap | Rejected: exact output and real kernel overlap in the trace, but the co-running kernels slowed each other and interleaved wall-clock runs were 0.5–0.9% slower. |
 | Sparse attention tiles cut across selection windows | Retained; distribute tiles across splits using a 64-block carry, keeping four resident blocks/CU. Independent review: AR +6.7% at 32K and +16.5% at 128K, d0 unchanged. Same keys, reassociated FP32 sums; FP64 operator and model-level rounding checks pass. [Evidence](artifacts/attention-tiles-review.json). |
 | Whole-tile carry across windows | Rejected: same output, but 16.5 KiB of LDS cost a resident block per CU and slowed d2K eight-row verification 8.5%. |
+| MTP-anchored prompt lookup (Framework fork) | Retained for greedy text: four-token committed-history match, up to six additional target-verified proposals, lazy 256 KiB/session index. Full-logit AR and snapshot gates pass; sampled/image paths bypass lookup. Copy acceptance is excluded from deeper MTP acceptance and batch timing calibration. [Machine measurements and OpenCode setup](FRAMEWORK.md). |
+
+The Framework copy-code profile isolates inference after loading (CLI, 1,068
+prompt tokens / 128 output tokens, one trace per binary). Kernel launches fall
+38,742 → 36,951; kernel time 2,351.4 → 2,150.5 ms; wall span 2,710.4 → 2,445.6 ms.
+GPU-busy fractions are 86.8% / 87.9%. Quantized-vector projection time falls
+742.3 → 476.6 ms, while wider target verification adds some MoE/recurrent work.
+MTP-support launches fall 224 → 46. Both traces emit identical token-ID hashes.
+These instrumented observations explain the mechanism; retained speed claims
+come from separate warmed, unprofiled HTTP runs.
 
 Separate d32K pp2048 profiling attributes 29.1% of kernel time to MoE, 34.9%
 to dense projections and 12.6% to attention/indexing. Final-tile catch-up

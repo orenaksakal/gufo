@@ -9,6 +9,34 @@ llama.cpp uses `b11069` for AR and `6fcaa16f` for MTP.
 Positive gain favors Gufo.
 [Quality and measurement details](QUALITY.md#benchmark-method) · [Model identities](artifacts/model-identities.json)
 
+## Framework fork: coding fixtures
+
+September 30, 2026 UTC, Framework Desktop Ryzen AI Max+ 395 / Radeon 8060S,
+128 GB. This machine's GCC 16.2.1 / ROCm 10 stack on both arms; upstream
+`f783fedb` versus the prompt-lookup fork. Production binaries, identical weights,
+C1, **196,608-token context capacity**, MTP ceiling seven, thinking off, seed 73.
+One warmup and three cache-bypassed tg128 requests per fixture; medians below.
+Decode rates exclude prefill; HTTP wall time includes the complete request.
+
+| Fixture | Prompt tokens | Upstream decode (tok/s) | Fork decode (tok/s) | Gain | HTTP wall, upstream → fork (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Prose control | 1,965 | 37.35 | 37.40 | +0.1% | 4,745 → 4,746 |
+| Copy code, greedy | 1,068 | 73.67 | 83.30 | +13.1% | 2,659 → 2,452 |
+| Edit code, greedy | 1,088 | 71.33 | 84.83 | +18.9% | 2,733 → 2,439 |
+| Repetition, greedy | 1,911 | 83.24 | 105.73 | +27.0% | 2,830 → 2,493 |
+| Sampled code control | 1,088 | 67.29 | 67.37 | +0.1% | 2,838 → 2,837 |
+
+All **15/15** measured completion byte hashes and token counts match upstream.
+Sampled control uses temperature 1, top-p 0.95 and top-k 20; lookup is greedy
+text-only. Copy/edit complete-request times improve 7.8% / 10.7%. These synthetic
+fixtures do not measure completed OpenCode tasks. A separate long tool-history
+check reaches 134,063 prompt tokens with exact replay and prefix reuse; its
+bounded EOS continuations are qualification cases, not tg128 speed samples.
+
+[Reproduction and OpenCode profile](FRAMEWORK.md) ·
+[Retained timings, hashes and qualification](artifacts/framework-review.json).
+The upstream reference tables below retain their original dates and toolchain.
+
 ## Single user, autoregressive
 
 Approximately pp2048 / tg128; depth is the cached prefix in tokens.
